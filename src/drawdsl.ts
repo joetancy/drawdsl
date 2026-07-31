@@ -110,6 +110,11 @@ const CONFIG = {
     minWidth: 120,
     minHeight: 120,
   },
+  layout: {
+    nodeSpacing: 80,
+    layerSpacing: 120,
+    edgeNodeSpacing: 40,
+  },
   elk: {
     // The inset between a group border/header and its contents. Increase
     // these values to give resources and routed edges more breathing room.
@@ -122,9 +127,6 @@ const CONFIG = {
     containerNodeSpacing: 80,
     containerLayerSpacing: 80,
     rootPadding: "[top=40,left=40,bottom=40,right=40]",
-    nodeSpacing: 80,
-    layerSpacing: 120,
-    edgeNodeSpacing: 40,
   },
 } as const;
 
@@ -323,7 +325,8 @@ const RESOURCE_DEFINITIONS: Record<string, ResourceDefinition> = {
   },
   sns: {
     kind: "resourceIcon",
-    icon: "simple_notification_service",
+    icon: "sns",
+    fill: "#E7157B",
   },
   sqs: {
     kind: "resourceIcon",
@@ -684,11 +687,11 @@ function buildElkGraph(ast: DocumentAst): ElkNode {
       "elk.direction": elkDirection(ast.direction),
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-      "elk.spacing.nodeNode": String(CONFIG.elk.nodeSpacing),
+      "elk.spacing.nodeNode": String(CONFIG.layout.nodeSpacing),
       "elk.layered.spacing.nodeNodeBetweenLayers": String(
-        CONFIG.elk.layerSpacing,
+        CONFIG.layout.layerSpacing,
       ),
-      "elk.spacing.edgeNode": String(CONFIG.elk.edgeNodeSpacing),
+      "elk.spacing.edgeNode": String(CONFIG.layout.edgeNodeSpacing),
       "elk.padding": CONFIG.elk.rootPadding,
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     },
@@ -856,9 +859,9 @@ function layoutWithDagre(ast: DocumentAst): LayoutResult {
   const graph = new graphlib.Graph({ compound: true, multigraph: true });
   graph.setGraph({
     rankdir: dagreDirection(ast.direction),
-    nodesep: CONFIG.elk.nodeSpacing,
-    ranksep: CONFIG.elk.layerSpacing,
-    edgesep: CONFIG.elk.edgeNodeSpacing,
+    nodesep: CONFIG.layout.nodeSpacing,
+    ranksep: CONFIG.layout.layerSpacing,
+    edgesep: CONFIG.layout.edgeNodeSpacing,
     marginx: 40,
     marginy: 40,
   });
