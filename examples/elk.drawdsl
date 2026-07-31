@@ -1,0 +1,19 @@
+# ELK is the default and provides orthogonal, hierarchy-aware routing.
+layout elk
+direction right
+
+internet internet "Internet"
+
+aws cloud "AWS Cloud" {
+  vpc application_vpc "Application VPC" {
+    private_subnet app_subnet "Application subnet" {
+      alb public_alb "Public ALB"
+      lambda api "API Lambda"
+      dynamodb data "Application data"
+    }
+  }
+}
+
+internet --> public_alb
+public_alb --> api
+api --> data
