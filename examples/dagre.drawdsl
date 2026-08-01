@@ -16,4 +16,4 @@ aws:cloud cloud "AWS Cloud" {
 
 internet --> public_alb
 public_alb --> api
-api --> data
+api <--> data : reads and writes

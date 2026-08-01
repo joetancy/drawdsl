@@ -1,6 +1,6 @@
 export type Direction = "right" | "left" | "down" | "up";
 export type LayoutEngine = "elk" | "dagre";
-export type EdgeOperator = "-->" | "-.->" | "---" | "-.-";
+export type EdgeOperator = "-->" | "-.->" | "---" | "-.-" | "<-->" | "<-.->";
 export type SymbolRole = "resource" | "container" | "annotation";
 
 export type SymbolRef = {

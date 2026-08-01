@@ -1,7 +1,7 @@
 import type { AstEdge, AstNode, Direction, DocumentAst, EdgeOperator, LayoutEngine, SymbolRef } from "./model.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
-const EDGE_RE = /^([A-Za-z_][\w-]*)\s*(-->|-\.->|---|-\.-)\s*([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
+const EDGE_RE = /^([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const LAYOUT_RE = /^layout\s+(elk|dagre)$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;

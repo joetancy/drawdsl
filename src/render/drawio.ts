@@ -21,9 +21,10 @@ function nodeStyle(node: FlatLayoutNode): string {
 }
 
 function edgeStyle(operator: EdgeOperator): string {
-    const directed = operator === "-->" || operator === "-.->";
-    const dashed = operator === "-.->" || operator === "-.-";
-    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, "startArrow=none", `dashed=${dashed ? "1" : "0"}`]);
+    const directed = operator === "-->" || operator === "-.->" || operator === "<-->" || operator === "<-.->";
+    const bidirectional = operator === "<-->" || operator === "<-.->";
+    const dashed = operator === "-.->" || operator === "-.-" || operator === "<-.->";
+    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`]);
 }
 
 export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {

@@ -12,6 +12,25 @@ test("requires namespaces and resolves aliases", () => {
     assert.throws(() => parseDsl("lambda handler"), /must be namespaced/);
 });
 
+test("supports bidirectional solid and dashed connections", () => {
+    const ast = parseDsl("aws:lambda source\naws:sns target\nsource <--> target\ntarget <-.-> source");
+    assert.deepEqual(ast.edges.map((edge) => edge.operator), ["<-->", "<-.->"]);
+    assert.throws(() => parseDsl("aws:lambda source\naws:sns target\nsource <-- target"), /unsupported syntax/);
+    assert.throws(() => parseDsl("aws:lambda source\naws:sns target\nsource <-.- target"), /unsupported syntax/);
+
+    const lambda = resolveSymbol({ namespace: "aws", name: "lambda" });
+    const sns = resolveSymbol({ namespace: "aws", name: "sns" });
+    const xml = renderDrawio(
+        [
+            { id: "source", symbol: lambda.ref, definition: lambda.definition, label: "Source", x: 0, y: 0, width: 80, height: 80, declarationOrder: 0 },
+            { id: "target", symbol: sns.ref, definition: sns.definition, label: "Target", x: 200, y: 0, width: 80, height: 80, declarationOrder: 1 },
+        ],
+        [{ ...ast.edges[0]!, points: [] }],
+    );
+    assert.match(xml, /startArrow=block/);
+    assert.match(xml, /endArrow=block/);
+});
+
 test("formatter uses four-space indentation", () => {
     const formatted = formatDsl('aws:cloud cloud "Cloud" {\naws:lambda fn\n}\n');
     assert.match(formatted, /\n {4}aws:lambda fn\n/);
