@@ -8,6 +8,8 @@
     "lint": "node --import tsx src/drawdsl.ts --check",
     "format": "node --import tsx src/drawdsl.ts --format",
     "format:write": "node --import tsx src/drawdsl.ts --format --write",
+    "lint:ts": "eslint \"**/*.ts\"",
+    "format:ts": "eslint \"**/*.ts\" --fix",
     "example": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
     "example:elk": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
     "example:dagre": "node --import tsx src/drawdsl.ts examples/dagre.drawdsl examples/dagre.drawio",
@@ -20,8 +22,12 @@
     "elkjs": "0.11.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.0.0",
+    "eslint": "^10.8.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.65.0"
   }
 }
