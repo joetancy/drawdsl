@@ -24,7 +24,25 @@ To convert another source file:
 npm run generate -- input.drawdsl output.drawio
 ```
 
-The CLI requires both paths. It exits with an error when parsing fails, an ID is duplicated, or an edge refers to a node that was not declared.
+Lint a file without producing a diagram:
+
+```bash
+npm run lint -- input.drawdsl
+```
+
+Preview consistently formatted DSL without modifying the file:
+
+```bash
+npm run format -- input.drawdsl
+```
+
+To apply four-space indentation formatting in place:
+
+```bash
+npm run format:write -- input.drawdsl
+```
+
+The linter checks syntax, container blocks, top-level directives, duplicate IDs, and edge references. The generator performs the same checks before creating a diagram.
 
 ## DSL at a glance
 

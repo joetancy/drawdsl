@@ -465,6 +465,39 @@ function canonicalType(type: string): string {
   return ALIASES[type] ?? type;
 }
 
+function formatDsl(source: string): string {
+  const output: string[] = [];
+  const lines = source.split(/\r?\n/);
+  let indent = 0;
+  let previousWasBlank = true;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let statement = lines[index]!;
+    while (hasUnclosedQuote(statement) && index + 1 < lines.length) {
+      index += 1;
+      statement += `\n${lines[index]!}`;
+    }
+
+    const statementLines = statement.split("\n");
+    const firstLine = statementLines[0]!.trim();
+    if (!firstLine) {
+      if (!previousWasBlank) output.push("");
+      previousWasBlank = true;
+      continue;
+    }
+
+    const code = stripComment(statement).trim();
+    if (code === "}") indent = Math.max(0, indent - 1);
+    output.push(`${"    ".repeat(indent)}${firstLine}`);
+    output.push(...statementLines.slice(1));
+    previousWasBlank = false;
+    if (code.endsWith("{")) indent += 1;
+  }
+
+  while (output.at(-1) === "") output.pop();
+  return `${output.join("\n")}\n`;
+}
+
 function parseDsl(source: string): DocumentAst {
   const rootNodes: AstNode[] = [];
   const edges: AstEdge[] = [];
@@ -1105,12 +1138,35 @@ function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
 }
 
 async function main(): Promise<void> {
-  const [, , inputArg, outputArg] = process.argv;
-  if (!inputArg || !outputArg) {
-    console.error("Usage: npx tsx src/drawdsl.ts input.drawdsl output.drawio");
-    process.exitCode = 2;
+  const args = process.argv.slice(2);
+  const [commandOrInput, possibleInput] = args;
+
+  if (commandOrInput === "--check") {
+    if (!possibleInput || args.length !== 2) return usage();
+    parseDsl(await readFile(possibleInput, "utf8"));
+    console.log(`Valid ${possibleInput}`);
     return;
   }
+
+  if (commandOrInput === "--format") {
+    const write = possibleInput === "--write";
+    const inputArg = args[write ? 2 : 1];
+    if (!inputArg || args.length !== (write ? 3 : 2)) return usage();
+    const source = await readFile(inputArg, "utf8");
+    parseDsl(source);
+    const formatted = formatDsl(source);
+    if (write) {
+      await writeFile(inputArg, formatted, "utf8");
+      console.log(`Formatted ${inputArg}`);
+    } else {
+      process.stdout.write(formatted);
+    }
+    return;
+  }
+
+  const inputArg = commandOrInput;
+  const outputArg = possibleInput;
+  if (!inputArg || !outputArg || args.length !== 2) return usage();
 
   const source = await readFile(inputArg, "utf8");
   const ast = parseDsl(source);
@@ -1120,6 +1176,15 @@ async function main(): Promise<void> {
       : await layoutWithElk(ast);
   await writeFile(outputArg, renderDrawio(nodes, edges), "utf8");
   console.log(`Created ${outputArg}`);
+}
+
+function usage(): void {
+  console.error(
+    "Usage: npx tsx src/drawdsl.ts input.drawdsl output.drawio\n" +
+      "       npx tsx src/drawdsl.ts --check input.drawdsl\n" +
+      "       npx tsx src/drawdsl.ts --format [--write] input.drawdsl",
+  );
+  process.exitCode = 2;
 }
 
 main().catch((error: unknown) => {

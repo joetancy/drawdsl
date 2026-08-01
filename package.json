@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "generate": "tsx src/drawdsl.ts",
+    "lint": "tsx src/drawdsl.ts --check",
+    "format": "tsx src/drawdsl.ts --format",
+    "format:write": "tsx src/drawdsl.ts --format --write",
     "example": "tsx src/drawdsl.ts examples/aws.drawdsl examples/aws.drawio",
     "example:elk": "tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
     "example:dagre": "tsx src/drawdsl.ts examples/dagre.drawdsl examples/dagre.drawio",
