@@ -1,19 +1,49 @@
-# ELK is the default and provides orthogonal, hierarchy-aware routing.
+# ELK is the default and provides hierarchy-aware orthogonal routing.
 layout elk
 direction right
 
-aws:internet internet "Internet"
+aws:internet internet "Public internet"
 
 aws:cloud cloud "AWS Cloud" {
-    aws:vpc application_vpc "Application VPC" {
-        aws:private_subnet app_subnet "Application subnet" {
-            aws:alb public_alb "Public ALB"
-            aws:lambda api "API Lambda"
-            aws:dynamodb data "Application data"
+    aws:vpc app_vpc "Application VPC" {
+        aws:public_subnet web_subnet "Public subnet" {
+            aws:cloudfront cdn "CloudFront"
+            aws:alb alb "Application Load Balancer"
+            aws:apigateway api "API Gateway"
         }
+
+        aws:private_subnet app_subnet "Application subnet" {
+            aws:lambda lambda1 "Orders Lambda"
+            aws:lambda lambda2 "Notifications Lambda"
+            aws:dynamodb data "Orders DynamoDB"
+            aws:sqs queue "Job queue"
+            core:text app_note "Private application workloads"
+        }
+    }
+
+    aws:vpc data_vpc "Data VPC" {
+        aws:private_subnet data_subnet "Data subnet" {
+            aws:rds database "Reporting database"
+            aws:s3 bucket "Archive bucket"
+        }
+    }
+
+    core:group operations "Operations" {
+        aws:sns topic "Deployment notifications"
+        aws:cloudwatch_2 monitoring "Monitoring"
+        core:text ops_note "Shared platform services"
     }
 }
 
-internet --> public_alb
-public_alb --> api
-api <--> data : reads and writes
+internet --> cdn : HTTPS
+cdn -.-> alb : cached requests
+alb --> api : forwards
+api --- lambda1 : invokes
+lambda1 -.- lambda2 : peer handoff
+lambda1 <--> data : reads and writes
+lambda2 <-.-> queue : async jobs
+data --> database : persists
+lambda1 --> bucket : archives
+topic --> lambda2 : notifications
+monitoring --- api : observes
+ops_note -.- app_note : runbook

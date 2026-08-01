@@ -21,6 +21,8 @@ npm run examples
 
 This generates the bundled ELK and Dagre examples in `examples/`.
 
+The examples use the same multi-tier architecture with nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles. This makes the ELK/Dagre layout differences visible on a more realistic graph.
+
 ## A tiny example
 
 ```text

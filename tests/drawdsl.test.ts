@@ -41,6 +41,9 @@ test("provider styles retain fully qualified draw.io shapes", () => {
     const result = renderDrawio([{ id: "topic", symbol: ref, definition, label: "SNS", x: 0, y: 0, width: 80, height: 80, declarationOrder: 0 }], []);
     assert.match(result, /mxgraph\.aws4\.sns/);
     assert.match(result, /fillColor=#E7157B/);
+
+    const sqs = resolveSymbol({ namespace: "aws", name: "sqs" });
+    assert.equal(sqs.definition.drawio.resIcon, "mxgraph.aws4.sqs");
 });
 
 test("AWS cloud and VPC groups keep their borders", () => {

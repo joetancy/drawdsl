@@ -122,7 +122,7 @@ const symbols: Record<string, SymbolDefinition> = {
     shield: resource("shield_shield_advanced", "#DD344C"),
     simple_email_service: resource("simple_email_service", "#3334B9"),
     sns: resource("sns", "#E7157B"),
-    sqs: resource("simple_queue_service"),
+    sqs: resource("sqs", "#E7157B"),
     stepfunctions: resource("step_functions"),
     tgw: resource("transit_gateway"),
     tgwa: shape("transit_gateway_attachment", "#8C4FFF"),
