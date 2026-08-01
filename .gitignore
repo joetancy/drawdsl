@@ -1,0 +1,12 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Local tooling noise
+*.log
+.DS_Store
+
+# Locally generated diagrams
+output.drawio
+rhmp.drawio
+convert.drawio
