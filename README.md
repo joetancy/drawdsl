@@ -1,226 +1,77 @@
 # drawdsl
 
-`drawdsl` is a deterministic TypeScript command-line tool for turning a small AWS-oriented architecture DSL into an editable draw.io (`.drawio`) diagram. It uses ELK to lay out nodes and containers, then writes native draw.io XML with AWS 4 icons and group shapes.
+`drawdsl` converts a namespaced architecture DSL into editable draw.io XML. ELK is the default layout engine; Dagre is available for compact layered layouts.
 
-## Getting started
-
-Install the project dependencies:
+## Usage
 
 ```bash
 npm install
-```
-
-Generate the bundled example:
-
-```bash
-npm run example
-```
-
-This creates `examples/aws.drawio`. Open that file in [diagrams.net](https://www.diagrams.net/) or draw.io Desktop, where every generated item remains editable.
-
-To convert another source file:
-
-```bash
 npm run generate -- input.drawdsl output.drawio
-```
-
-Lint a file without producing a diagram:
-
-```bash
 npm run lint -- input.drawdsl
-```
-
-Preview consistently formatted DSL without modifying the file:
-
-```bash
 npm run format -- input.drawdsl
-```
-
-To apply four-space indentation formatting in place:
-
-```bash
 npm run format:write -- input.drawdsl
 ```
 
-The linter checks syntax, container blocks, top-level directives, duplicate IDs, and edge references. The generator performs the same checks before creating a diagram.
+`lint` parses the file without generating output. `format` prints canonical four-space indentation; `format:write` updates the source file.
 
-## DSL at a glance
+## Namespaced DSL
 
-Each non-empty line is one declaration, connection, container delimiter, or direction setting. `#` starts a comment unless it appears inside a quoted label.
+Every declaration must use `namespace:name`. The namespace selects a symbol provider and the name selects a symbol in that provider:
 
 ```text
-direction right
 layout elk
+direction right
 
-internet "Public internet"
-
-aws production "Production AWS Account" {
-  cloudfront website "rental.example.gov.sg"
-  waf web_acl "Web ACL"
-  s3 frontend "Frontend"
+aws:internet internet "Public internet"
+aws:cloud cloud "AWS Cloud" {
+    aws:vpc app_vpc "Application VPC" {
+        aws:lambda handler "Request handler"
+        core:text note "Deployed by the platform team"
+    }
 }
 
-internet --> website : HTTPS
-website -.- web_acl
-website -.-> frontend : "Origin request"
+internet --> handler : HTTPS
 ```
 
-Whitespace is flexible. IDs and types may contain letters, numbers, underscores, and hyphens, but must begin with a letter or underscore.
+Unqualified declarations such as `lambda handler` are rejected with a migration hint. Node IDs remain unnamespaced and are global across the document. Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted labels.
 
-### Direction
+For an existing file, the included one-time migrator prefixes declarations with the built-in namespaces:
 
-Set the overall ELK layout direction with one of:
+```bash
+node --import tsx scripts/migrate-namespaces.ts old.drawdsl
+```
+
+The built-in providers are:
+
+- `aws:*` — AWS resource icons, AWS shapes, and AWS group containers.
+- `core:text` — editable text annotation.
+- `core:box` — generic editable resource box.
+- `core:group` — generic container.
+
+Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/symbols/core.ts](src/symbols/core.ts). Add another provider by implementing `SymbolProvider` and registering it in [src/symbols/registry.ts](src/symbols/registry.ts); the parser, layout engines, and renderer consume the shared symbol model and do not need provider-specific changes.
+
+AWS aliases are namespace-local, for example `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce`.
+
+## Containers, directions, and layouts
+
+AWS containers include `aws:cloud`, `aws:vpc`, `aws:subnet`, `aws:private_subnet`, `aws:public_subnet`, and `aws:az`. `core:group` is a provider-neutral container. Containers open with `{` and close with `}`.
 
 ```text
-direction right
-direction left
-direction down
-direction up
+direction right   # right, left, down, or up
+layout elk        # elk or dagre
 ```
 
-If omitted, the direction is `right`. It is a top-level setting and cannot appear inside a container block.
-
-### Layout engine
-
-ELK is the default layout engine. It is the best choice for diagrams with nested groups and many connectors because it provides orthogonal routing and exports ELK's bendpoints as editable draw.io waypoints.
-
-Use Dagre for a lighter, compact Sugiyama-style layered layout:
-
-```text
-layout dagre
-direction down
-```
-
-`layout` is a top-level setting. Its values are `elk` and `dagre`; omitting it is the same as `layout elk`. Dagre supports the same resource, container, direction, and connection syntax, but its connector routing is simpler.
-
-The paired [ELK example](examples/elk.drawdsl) and [Dagre example](examples/dagre.drawdsl) use the same input graph, so they are directly comparable. Generate both with:
+ELK provides hierarchy-aware orthogonal routing and editable bendpoints. Dagre provides a compact layered arrangement but simpler routing. Compare the bundled inputs with:
 
 ```bash
 npm run examples
 ```
-
-### Nodes
-
-The normal declaration form is:
-
-```text
-type id "Displayed label"
-```
-
-The ID and label are optional:
-
-```text
-cloudfront website "Website"  # explicit ID and label
-cloudfront website            # label defaults to "website"
-cloudfront "Website"          # ID defaults to "cloudfront"
-cloudfront                    # ID is "cloudfront"; label is "cloudfront"
-internet                      # label is "Internet"
-```
-
-IDs are global across the whole document, including nested containers. Use explicit IDs whenever a type occurs more than once. Quoted labels support `\"`, `\\`, and `\n` escapes.
-
-Recognised resources render as AWS icons. An unrecognised type is still valid and renders as a neutral rounded rectangle, which makes the DSL usable for custom systems too.
-
-Use `text` to add an editable annotation box. Its width and height are calculated from the label; `textbox` is an alias. Labels may span literal lines or use `\n`.
-
-```text
-text deployment_note "Deploys only from the approved CI pipeline"
-textbox owner_note "Platform team owns this VPC"
-```
-
-### AWS resource types
-
-The following resource keywords have an AWS-specific icon or shape:
-
-```text
-internet          general               illustration_desktop  illustration_users
-apigateway        alb                   nlb                   elb
-cloudfront        waf                   shield                cloudhsm
-client_vpn        internetgateway       natgateway            endpoint
-vpcendpoint       eni                   tgw                   tgwa
-route53           route_53_resolver     lambda                dynamodb
-s3                sqs                   sns                   eventbridge
-kinesis_data_stream ecr                 ecs                   eks
-elasticsearch_service aoss              rds                   iam
-role              secretsmanager        key_management_service certificate_manager_2
-certificate_manager_3 cloudwatch_2      cloudtrail            backup
-guardduty         inspector             security_hub          networkfirewall
-network_firewall_endpoints generic_firewall app_config         ses
-simple_email_service stepfunctions
-text
-```
-
-These aliases are accepted:
-
-| Alias | Canonical type |
-| --- | --- |
-| `api_gateway` | `apigateway` |
-| `igw`, `internet_gateway` | `internetgateway` |
-| `kinesis`, `kinesisdatastream`, `kinesis_data_streams` | `kinesis_data_stream` |
-| `nat`, `nat_gateway` | `natgateway` |
-| `networkloadbalancer`, `network_load_balancer` | `nlb` |
-| `transitgateway`, `transit_gateway` | `tgw` |
-| `transitgatewayattachment`, `transit_gateway_attachment` | `tgwa` |
-| `vpce` | `vpcendpoint` |
-| `textbox` | `text` |
-
-For AWS icons with a longer resource name, use the keyword exactly as listed above. For example:
-
-```text
-client_vpn staff_vpn "Staff VPN"
-route_53_resolver inbound_dns "Inbound Resolver"
-network_firewall_endpoints firewall_endpoints "Network Firewall endpoints"
-key_management_service kms "KMS"
-security_hub security_hub "Security Hub"
-illustration_users users "Application users"
-```
-
-### Containers
-
-Containers use the same declaration form followed by `{`, and must be closed with `}`. They can be nested.
-
-```text
-aws cloud "AWS Cloud" {
-  vpc app_vpc "Application VPC" {
-    public_subnet public_web "Public subnet" {
-      alb ingress "Application Load Balancer"
-    }
-    private_subnet private_app "Private subnet" {
-      lambda handler "Application handler"
-    }
-  }
-}
-```
-
-Supported container types are `aws`, `vpc`, `subnet`, `private_subnet`, `public_subnet`, `az`, and `group`. `subnet` and `private_subnet` use the private-subnet style; `public_subnet` uses a distinct public-subnet style. A container without `{` is an error, as is a `{` block on a resource declaration.
-
-### Connections
-
-Connections can appear inside or outside containers and may connect any two declared IDs:
-
-```text
-source --> target       # directed, solid
-source -.-> target      # directed, dashed
-source --- target       # undirected, solid
-source -.- target       # undirected, dashed
-source --> target : HTTPS
-source --> target : "HTTPS via CloudFront"
-```
-
-An edge label is optional and is displayed in draw.io. Lines are validated after all declarations have been read, so forward references are allowed.
-
-## Layout and output
-
-ELK uses the layered algorithm with the selected direction, orthogonal routing, and hierarchy support for nested containers. It determines node positions, container sizes, and intermediate connector bends. Those bends are written as editable draw.io edge waypoints, while the connector endpoints remain attached to their source and target cells.
-
-The generated file has one page named `Architecture` and uses draw.io's AWS 4 library styles for supported AWS resources and containers.
 
 ## Development
 
-The project currently has no automated test suite. The example generation command is the practical end-to-end smoke test:
-
 ```bash
-npm run example
-npm run generate -- examples/dagre.drawdsl examples/dagre.drawio
-npm run examples
+npm run check
+npm test
 ```
+
+The parser, formatter, provider registry, and draw.io renderer are covered by tests in `tests/`.

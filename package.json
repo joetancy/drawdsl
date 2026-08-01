@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate": "tsx src/drawdsl.ts",
-    "lint": "tsx src/drawdsl.ts --check",
-    "format": "tsx src/drawdsl.ts --format",
-    "format:write": "tsx src/drawdsl.ts --format --write",
-    "example": "tsx src/drawdsl.ts examples/aws.drawdsl examples/aws.drawio",
-    "example:elk": "tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
-    "example:dagre": "tsx src/drawdsl.ts examples/dagre.drawdsl examples/dagre.drawio",
+    "generate": "node --import tsx src/drawdsl.ts",
+    "lint": "node --import tsx src/drawdsl.ts --check",
+    "format": "node --import tsx src/drawdsl.ts --format",
+    "format:write": "node --import tsx src/drawdsl.ts --format --write",
+    "example": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
+    "example:elk": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
+    "example:dagre": "node --import tsx src/drawdsl.ts examples/dagre.drawdsl examples/dagre.drawio",
     "examples": "npm run example:elk && npm run example:dagre",
+    "test": "node --import tsx --test tests/*.test.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {
