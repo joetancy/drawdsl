@@ -6,7 +6,3 @@ dist/
 *.log
 .DS_Store
 
-# Locally generated diagrams
-output.drawio
-rhmp.drawio
-convert.drawio
