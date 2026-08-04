@@ -46,6 +46,13 @@ test("provider styles retain fully qualified draw.io shapes", () => {
 
     const sqs = resolveSymbol({ namespace: "aws", name: "sqs" });
     assert.equal(sqs.definition.drawio.resIcon, "mxgraph.aws4.sqs");
+
+    const nlb = resolveSymbol({ namespace: "aws", name: "nlb" });
+    const alb = resolveSymbol({ namespace: "aws", name: "alb" });
+    assert.equal(nlb.definition.drawio.shape, "mxgraph.aws4.network_load_balancer");
+    assert.equal(alb.definition.drawio.shape, "mxgraph.aws4.application_load_balancer");
+    assert.equal(nlb.definition.drawio.fill, "#8C4FFF");
+    assert.equal(alb.definition.drawio.fill, "#8C4FFF");
 });
 
 test("core images render as image cells without a visible label", () => {
@@ -57,11 +64,36 @@ test("core images render as image cells without a visible label", () => {
     assert.match(xml, /value=""/);
 });
 
+test("anonymous spacers reserve layout space without rendering", async () => {
+    const ast = parseDsl(`core:layout row {
+    grid-columns 3
+    aws:lambda first
+    core:spacer
+    aws:lambda third
+}
+core:spacer`);
+    const spacers = ast.nodes.flatMap((node) => [node, ...node.children]).filter((node) => node.symbol.name === "spacer");
+    assert.equal(spacers.length, 2);
+    assert.notEqual(spacers[0]?.id, spacers[1]?.id);
+    assert.match(spacers[0]?.id ?? "", /^__core_spacer_\d+$/);
+    assert.throws(() => parseDsl("core:spacer\naws:lambda fn\n__core_spacer_1 --> fn"), /Invisible node cannot be an edge endpoint/);
+
+    const layout = await layoutWithElk(ast);
+    const spacer = layout.nodes.find((node) => node.id === spacers[0]?.id)!;
+    assert.equal(spacer.width, 80);
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    assert.doesNotMatch(xml, /__core_spacer_/);
+});
+
 test("AWS cloud and VPC groups keep their borders", () => {
     const cloud = resolveSymbol({ namespace: "aws", name: "cloud" }).definition;
     const vpc = resolveSymbol({ namespace: "aws", name: "vpc" }).definition;
+    const region = resolveSymbol({ namespace: "aws", name: "region" }).definition;
     assert.equal(cloud.drawio.styles?.includes("grStroke=0"), false);
     assert.equal(vpc.drawio.styles?.includes("grStroke=0"), false);
+    assert.equal(region.drawio.styles?.includes("grIcon=mxgraph.aws4.group_region"), true);
+    assert.equal(region.drawio.styles?.includes("dashed=1"), true);
+    assert.equal(region.drawio.stroke, "#00A4A6");
 });
 
 test("layout-only grids accept connected children and stay invisible in draw.io", async () => {
@@ -69,6 +101,7 @@ test("layout-only grids accept connected children and stay invisible in draw.io"
 core:group workers {
     core:layout columns {
         grid-columns 2
+        node-spacing 140
         aws:lambda worker_a
         aws:lambda worker_b
         aws:lambda worker_c
@@ -88,6 +121,9 @@ worker_a --> worker_d`);
     const workers = layout.nodes.filter((node) => node.parentId === "columns");
     assert.equal(new Set(workers.map((node) => node.x)).size, 2);
     assert.equal(new Set(workers.map((node) => node.y)).size, 2);
+    const workerA = layout.nodes.find((node) => node.id === "worker_a")!;
+    const workerB = layout.nodes.find((node) => node.id === "worker_b")!;
+    assert.equal(workerB.x - (workerA.x + workerA.width), 140);
     const group = layout.nodes.find((node) => node.id === "workers")!;
     for (const worker of workers) {
         assert.ok(worker.x >= group.x && worker.y >= group.y);
@@ -171,7 +207,25 @@ source --> target`);
     }
 });
 
-test("container-scoped direction and layer-bound are rejected", () => {
-    assert.throws(() => parseDsl("core:group workers {\n    direction down\n}"), /direction must be top-level/);
+test("container-scoped ELK direction controls local layered layout", async () => {
+    const ast = parseDsl(`layout elk
+direction right
+core:group workers {
+    direction down
+    aws:lambda first
+    aws:lambda second
+    first --> second
+}`);
+    assert.equal(ast.nodes[0]?.direction, "down");
+    const layout = await layoutWithElk(ast);
+    const first = layout.nodes.find((node) => node.id === "first")!;
+    const second = layout.nodes.find((node) => node.id === "second")!;
+    assert.equal(first.x, second.x);
+    assert.ok(first.y < second.y);
+
+    assert.throws(() => parseDsl("core:group workers {\n    direction down\n    direction right\n}"), /direction is already set/);
+    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    direction down\n}"), /container direction is only supported with layout elk/);
     assert.throws(() => parseDsl("core:group workers {\n    layer-bound 2\n}"), /unsupported syntax/);
+    assert.throws(() => parseDsl("node-spacing 140"), /must be inside a container/);
+    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    node-spacing 140\n}"), /only supported with layout elk/);
 });

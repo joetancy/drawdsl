@@ -1,4 +1,4 @@
-import { isLayoutOnly, type FlatLayoutNode, type Point, type RoutedEdge } from "../model.js";
+import { isRenderable, type FlatLayoutNode, type Point, type RoutedEdge } from "../model.js";
 
 function xmlEscape(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
@@ -47,11 +47,11 @@ export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): stri
         '    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
         "      <root>", '        <mxCell id="0"/>', '        <mxCell id="1" parent="0"/>',
     ];
-    const ordered = nodes.filter((node) => !isLayoutOnly(node)).sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
+    const ordered = nodes.filter(isRenderable).sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const parentFor = (node: FlatLayoutNode): FlatLayoutNode | undefined => {
         let parent = node.parentId ? byId.get(node.parentId) : undefined;
-        while (parent && isLayoutOnly(parent)) parent = parent.parentId ? byId.get(parent.parentId) : undefined;
+        while (parent && !isRenderable(parent)) parent = parent.parentId ? byId.get(parent.parentId) : undefined;
         return parent;
     };
     for (const node of ordered) {

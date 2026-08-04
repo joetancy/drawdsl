@@ -21,6 +21,8 @@ export type SymbolDefinition = {
     drawio: DrawioSymbolStyle;
     /** A structural container that participates in layout but is not rendered. */
     layoutOnly?: boolean;
+    /** A layout participant that is intentionally omitted from draw.io output. */
+    render?: boolean;
     widthScale?: number;
     heightScale?: number;
     defaultLabel?: string;
@@ -40,6 +42,8 @@ export type AstNode = {
     parentId?: string;
     children: AstNode[];
     gridColumns?: number;
+    nodeSpacing?: number;
+    direction?: Direction;
     declarationOrder: number;
 };
 
@@ -95,4 +99,8 @@ export function isContainer(node: AstNode | FlatLayoutNode): boolean {
 
 export function isLayoutOnly(node: AstNode | FlatLayoutNode): boolean {
     return node.definition.layoutOnly === true;
+}
+
+export function isRenderable(node: AstNode | FlatLayoutNode): boolean {
+    return node.definition.render !== false && !isLayoutOnly(node);
 }

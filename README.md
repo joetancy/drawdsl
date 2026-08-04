@@ -21,7 +21,7 @@ npm run examples
 
 This generates the bundled ELK and Dagre examples in `examples/`.
 
-The examples use the same multi-tier architecture with nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles. This makes the ELK/Dagre layout differences visible on a more realistic graph.
+The examples use the same multi-tier architecture with an AWS Region, nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles. This makes the ELK/Dagre layout differences visible on a more realistic graph.
 
 ## A tiny example
 
@@ -31,9 +31,11 @@ direction right
 
 aws:internet internet "Public internet"
 aws:cloud cloud "AWS Cloud" {
-    aws:vpc app_vpc "Application VPC" {
-        aws:lambda handler "Request handler"
-        core:text note "Deployed by the platform team"
+    aws:region singapore "ap-southeast-1" {
+        aws:vpc app_vpc "Application VPC" {
+            aws:lambda handler "Request handler"
+            core:text note "Deployed by the platform team"
+        }
     }
 }
 
@@ -65,6 +67,7 @@ Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted
 | `core:box` | Generic editable resource box |
 | `core:group` | Provider-neutral container |
 | `core:layout` | Invisible structural container for ELK layout |
+| `core:spacer` | Anonymous invisible, icon-sized layout gap |
 
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
 
@@ -78,9 +81,17 @@ Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/s
 
 ## Containers and layout
 
-AWS containers include `aws:cloud`, `aws:vpc`, `aws:subnet`, `aws:private_subnet`, `aws:public_subnet`, and `aws:az`. `core:group` provides a neutral alternative. Containers use braces and can be nested.
+AWS containers include `aws:cloud`, `aws:region`, `aws:vpc`, `aws:subnet`, `aws:private_subnet`, `aws:public_subnet`, and `aws:az`. `core:group` provides a neutral alternative. Containers use braces and can be nested.
 
 Use `core:layout` for an invisible, structural container. It affects placement but does not create a draw.io cell, border, or label. This is useful when the visual architecture needs stable columns or grids without introducing another visible group.
+
+Use `core:spacer` without an ID to reserve an empty, icon-sized grid slot. It is not rendered or available as an edge endpoint:
+
+```text
+aws:lambda first
+core:spacer
+aws:lambda third
+```
 
 ```text
 aws:vpc application {
@@ -107,7 +118,30 @@ worker --> records
 
 `grid-columns` applies to a container’s direct children and is supported with `layout elk`. Child subtrees are first sized, then placed into an exact declaration-ordered grid. Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
 
+Use `node-spacing` inside an ELK container to override its direct-child gap without changing the global defaults:
+
+```text
+core:layout application_grid {
+    grid-columns 5
+    node-spacing 140
+}
+```
+
+ELK containers can also override the document flow direction for their non-grid children:
+
+```text
+core:group workers {
+    direction down
+    aws:lambda first
+    aws:lambda second
+}
+```
+
+Container directions support `right`, `left`, `down`, and `up`. A strict `grid-columns` layout remains grid-ordered, so its direction is ignored.
+
 This keeps the two concerns separate: ELK positions the hierarchy and Libavoid routes the completed geometry with orthogonal, obstacle-aware connectors. For each edge group, visible containers unrelated to either endpoint become routing obstacles; the source and destination ancestor containers stay traversable so connections can still enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points, so edge origins are spread across resource boundaries instead of all leaving from a single side.
+
+Global ELK layout defaults are in `src/config.ts`. `edgeNudgingDistance` controls the spacing Libavoid aims to keep between parallel route segments; the default is `16` pixels.
 
 ```text
 direction right   # right, left, down, or up

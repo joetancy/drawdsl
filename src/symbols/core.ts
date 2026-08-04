@@ -45,6 +45,14 @@ export const coreProvider: SymbolProvider = {
                 shape: "rectangle",
             },
         },
+        spacer: {
+            role: "resource",
+            render: false,
+            defaultLabel: "",
+            drawio: {
+                shape: "rectangle",
+            },
+        },
         box: {
             role: "resource",
             drawio: {

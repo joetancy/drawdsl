@@ -2,7 +2,7 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import { routeEdges } from "@mr_mint/elkjs-libavoid";
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api.js";
 import { CONFIG } from "../config.js";
-import { isContainer, isLayoutOnly, type AstEdge, type AstNode, type DocumentAst, type FlatLayoutNode, type LayoutResult, type Point, type RoutedEdge } from "../model.js";
+import { isContainer, isLayoutOnly, isRenderable, type AstEdge, type AstNode, type DocumentAst, type FlatLayoutNode, type LayoutResult, type Point, type RoutedEdge } from "../model.js";
 import { byDeclarationOrder, dimensions, elkDirection, flattenAst, simplifyWaypoints } from "./common.js";
 
 type ElkEngine = { layout(graph: ElkNode): Promise<ElkNode> };
@@ -59,14 +59,15 @@ function padding(node: AstNode): string {
     return `[top=${value.top},left=${value.left},bottom=${value.bottom},right=${value.right}]`;
 }
 
-function nodeSpacing(children: PositionedNode[]): number {
+function nodeSpacing(container: AstNode | undefined, children: PositionedNode[]): number {
+    if (container?.nodeSpacing !== undefined) return container.nodeSpacing;
     return children.every((child) => isContainer(child.ast)) ? CONFIG.elk.containerNodeSpacing : CONFIG.elk.resourceNodeSpacing;
 }
 
 function layoutGrid(container: AstNode, children: PositionedNode[]): LocalLayout {
     const columnCount = Math.min(container.gridColumns!, children.length);
     const rowCount = Math.ceil(children.length / columnCount);
-    const spacing = nodeSpacing(children);
+    const spacing = nodeSpacing(container, children);
     const columnWidths = Array.from({ length: columnCount }, () => 0);
     const rowHeights = Array.from({ length: rowCount }, () => 0);
     for (const [index, child] of children.entries()) {
@@ -109,7 +110,7 @@ async function layoutChildren(
     if (!children.length) return { children, width: container ? dimensions(container).width : 0, height: container ? dimensions(container).height : 0 };
     const columns = container?.gridColumns;
     if (container && columns) return layoutGrid(container, children);
-    const spacing = container ? nodeSpacing(children) : CONFIG.layout.nodeSpacing;
+    const spacing = container ? nodeSpacing(container, children) : CONFIG.layout.nodeSpacing;
     const layoutOptions: Record<string, string> = {
         "elk.algorithm": "layered",
         "elk.padding": container ? padding(container) : CONFIG.elk.rootPadding,
@@ -117,7 +118,7 @@ async function layoutChildren(
         "elk.layered.spacing.nodeNodeBetweenLayers": String(container ? CONFIG.elk.containerLayerSpacing : CONFIG.layout.layerSpacing),
         "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     };
-    if (!container) layoutOptions["elk.direction"] = elkDirection(ast.direction);
+    layoutOptions["elk.direction"] = elkDirection(container?.direction ?? ast.direction);
     const graph: ElkNode = {
         id: container?.id ?? "root",
         children: children.map((child) => ({
@@ -213,7 +214,7 @@ function routingGraph(nodes: FlatLayoutNode[], group: RoutingGroup): ElkNode {
         return false;
     };
     const children: ElkNode[] = nodes.filter((node) => {
-        if (isLayoutOnly(node)) return false;
+        if (!isRenderable(node)) return false;
         if (endpoints.has(node.id)) return true;
         if (hasBlockingAncestor(node)) return false;
         return !isContainer(node) || blockingContainers.has(node.id);
@@ -233,7 +234,7 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
         const groupRoutes = await routeEdges(routingGraph(nodes, group), {
             routingType: "orthogonal",
             shapeBufferDistance: 8,
-            idealNudgingDistance: 8,
+            idealNudgingDistance: CONFIG.elk.edgeNudgingDistance,
             crossingPenalty: 100,
             nudgeOrthogonalSegmentsConnectedToShapes: true,
             nudgeOrthogonalTouchingColinearSegments: true,

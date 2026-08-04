@@ -1,10 +1,11 @@
-import type { AstEdge, AstNode, Direction, DocumentAst, EdgeOperator, LayoutEngine, SymbolRef } from "./model.js";
+import { isRenderable, type AstEdge, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type LayoutEngine, type SymbolRef } from "./model.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
 const EDGE_RE = /^([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const LAYOUT_RE = /^layout\s+(elk|dagre)$/;
 const GRID_COLUMNS_RE = /^grid-columns\s+([1-9]\d*)$/;
+const NODE_SPACING_RE = /^node-spacing\s+([1-9]\d*)$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
@@ -61,6 +62,7 @@ export function parseDsl(source: string): DocumentAst {
     let direction: Direction = "right";
     let layoutEngine: LayoutEngine = "elk";
     let order = 0;
+    let anonymousNodeCount = 0;
 
     const sourceLines = source.split(/\r?\n/);
     for (let index = 0; index < sourceLines.length; index += 1) {
@@ -80,8 +82,12 @@ export function parseDsl(source: string): DocumentAst {
         }
         const directionMatch = line.match(DIRECTION_RE);
         if (directionMatch) {
-            if (stack.length) throw new Error(`Line ${lineNumber}: direction must be top-level`);
-            direction = directionMatch[1] as Direction;
+            const container = stack.at(-1);
+            if (!container) direction = directionMatch[1] as Direction;
+            else {
+                if (container.direction !== undefined) throw new Error(`Line ${lineNumber}: direction is already set for container ${container.id}`);
+                container.direction = directionMatch[1] as Direction;
+            }
             continue;
         }
         const layoutMatch = line.match(LAYOUT_RE);
@@ -96,6 +102,14 @@ export function parseDsl(source: string): DocumentAst {
             if (!container) throw new Error(`Line ${lineNumber}: grid-columns must be inside a container`);
             if (container.gridColumns !== undefined) throw new Error(`Line ${lineNumber}: grid-columns is already set for container ${container.id}`);
             container.gridColumns = Number(gridColumnsMatch[1]);
+            continue;
+        }
+        const nodeSpacingMatch = line.match(NODE_SPACING_RE);
+        if (nodeSpacingMatch) {
+            const container = stack.at(-1);
+            if (!container) throw new Error(`Line ${lineNumber}: node-spacing must be inside a container`);
+            if (container.nodeSpacing !== undefined) throw new Error(`Line ${lineNumber}: node-spacing is already set for container ${container.id}`);
+            container.nodeSpacing = Number(nodeSpacingMatch[1]);
             continue;
         }
         const edgeMatch = line.match(EDGE_RE);
@@ -127,7 +141,13 @@ export function parseDsl(source: string): DocumentAst {
         if (opensBlock && !container) throw new Error(`Line ${lineNumber}: resource property blocks are not implemented`);
         if (!opensBlock && container) throw new Error(`Line ${lineNumber}: container ${symbol.ref.name} must open a block with {`);
 
-        const id = explicitId ?? symbol.ref.name;
+        let id = explicitId ?? symbol.ref.name;
+        if (!explicitId && symbol.definition.render === false) {
+            do {
+                anonymousNodeCount += 1;
+                id = `__${symbol.ref.namespace}_${symbol.ref.name}_${anonymousNodeCount}`;
+            } while (ids.has(id));
+        }
         const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (ids.has(id)) throw new Error(`Line ${lineNumber}: duplicate node ID ${id}`);
         ids.add(id);
@@ -155,8 +175,12 @@ export function parseDsl(source: string): DocumentAst {
     for (const edge of edges) {
         if (!ids.has(edge.source)) throw new Error(`Unknown edge source: ${edge.source}`);
         if (!ids.has(edge.target)) throw new Error(`Unknown edge target: ${edge.target}`);
-        if (nodesById.get(edge.source)?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.source}`);
-        if (nodesById.get(edge.target)?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.target}`);
+        const source = nodesById.get(edge.source);
+        const target = nodesById.get(edge.target);
+        if (source?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.source}`);
+        if (target?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.target}`);
+        if (source && !isRenderable(source)) throw new Error(`Invisible node cannot be an edge endpoint: ${edge.source}`);
+        if (target && !isRenderable(target)) throw new Error(`Invisible node cannot be an edge endpoint: ${edge.target}`);
     }
     const containers = [...rootNodes];
     while (containers.length) {
@@ -168,6 +192,13 @@ export function parseDsl(source: string): DocumentAst {
         if (layoutEngine !== "elk") throw new Error(`grid-columns is only supported with layout elk (container ${container.id})`);
         if (!container.children.length) throw new Error(`grid-columns requires at least one child (container ${container.id})`);
         containers.push(...container.children);
+    }
+    const spacingContainers = [...rootNodes];
+    while (spacingContainers.length) {
+        const container = spacingContainers.pop()!;
+        if (container.nodeSpacing !== undefined && layoutEngine !== "elk") throw new Error(`node-spacing is only supported with layout elk (container ${container.id})`);
+        if (container.direction !== undefined && layoutEngine !== "elk") throw new Error(`container direction is only supported with layout elk (container ${container.id})`);
+        spacingContainers.push(...container.children);
     }
     return { direction, layoutEngine, nodes: rootNodes, edges };
 }

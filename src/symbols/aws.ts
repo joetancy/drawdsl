@@ -37,6 +37,7 @@ function group(
     icon: string,
     fontColor: string,
     suppressBorder = false,
+    dashed = false,
 ): SymbolDefinition {
     return {
         role: "container",
@@ -48,6 +49,7 @@ function group(
                 `grIcon=${AWS4}.${icon}`,
                 ...(suppressBorder ? ["grStroke=0"] : []),
                 `fontColor=${fontColor}`,
+                ...(dashed ? ["dashed=1"] : []),
             ],
         },
     };
@@ -72,13 +74,14 @@ const symbols: Record<string, SymbolDefinition> = {
         true,
     ),
     az: group("none", "#147EBA", "group_availability_zone", "#147EBA"),
+    region: group("none", "#00A4A6", "group_region", "#147EBA", false, true),
     internet: shape("internet", "#232F3D", "none", {
         widthScale: 1,
         heightScale: 0.6,
     }),
     apigateway: resource("api_gateway", "#E7157B"),
     app_config: resource("app_config", "#E7157B"),
-    alb: resource("application_load_balancer"),
+    alb: shape("application_load_balancer", "#8C4FFF"),
     aoss: resource("elasticsearch_service"),
     backup: resource("backup", "#277116"),
     certificate_manager_2: shape("certificate_manager_2", "#BF0816"),
