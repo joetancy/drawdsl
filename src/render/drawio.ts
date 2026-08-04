@@ -8,7 +8,7 @@ function styleString(tokens: readonly string[]): string { return `${tokens.join(
 function nodeStyle(node: FlatLayoutNode): string {
     const drawio = node.definition.drawio;
     if (node.symbol.namespace === "core" && node.symbol.name === "image") {
-        return styleString(["shape=image", "imageAspect=0", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
+        return styleString(["shape=image", "imageAspect=1", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
     }
     if (node.definition.role === "container") {
         return styleString([
