@@ -27,7 +27,7 @@ export const CONFIG = {
     containerNodeSpacing: 160,
     containerLayerSpacing: 240,
     edgeSpacing: 20,
-    edgeEndpointClearance: 32,
+    edgeEndpointClearance: 40,
     rootPadding: "[top=40,left=40,bottom=40,right=40]",
   },
 } as const;
