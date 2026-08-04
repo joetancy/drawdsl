@@ -149,9 +149,11 @@ core:group workers {
 
 Container directions support `right`, `left`, `down`, and `up`. A strict `grid-columns` layout remains grid-ordered, so its direction is ignored.
 
-This keeps the two concerns separate: ELK positions the hierarchy and Libavoid routes the completed geometry with orthogonal, obstacle-aware connectors. For each edge group, visible containers unrelated to either endpoint become routing obstacles; the source and destination ancestor containers stay traversable so connections can still enter and leave them. `core:layout` is never an obstacle. A final global lane pass then offsets shared internal segments and avoidable crossings when the adjusted path remains clear of that edge's obstacles. Draw.io receives the resulting bendpoints and attachment points, so edge origins are spread across resource boundaries instead of all leaving from a single side.
+ELK positions the hierarchy and the orthogonal router uses the completed geometry. Visible containers unrelated to either endpoint remain routing obstacles, while source and destination ancestor containers stay traversable so connections can enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points.
 
-Global ELK layout defaults are in `src/config.ts`. `edgeNudgingDistance` controls the spacing Libavoid and the lane pass aim to keep between parallel route segments; `edgeCrossingPenalty` makes crossing an existing edge more expensive.
+Set `CONFIG.elk.edgeSpacing` in `src/config.ts` to the global gap between overlapping parallel route segments (24px by default). Edges are routed with their own container obstacles, then a final obstacle-aware lane pass applies the same spacing across routes from different container-routing passes. Set `CONFIG.elk.edgeEndpointClearance` independently to control the minimum straight run leaving or entering a node before an orthogonal bend (also 24px by default). Shared-path nudging is enabled so edges are kept distinct. Perpendicular crossings are allowed and do not affect routing. When the available geometry cannot fit a lane, the router preserves an obstacle-free route instead of forcing an invalid one.
+
+Explicit `T:`, `R:`, `B:`, and `L:` endpoint selectors remain available when a relationship needs a specific source or target side.
 
 ```text
 direction right   # right, left, down, or up

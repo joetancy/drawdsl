@@ -8,7 +8,7 @@ export const CONFIG = {
     verticalPadding: 15,
   },
   container: {
-    minWidth: 120,
+    minWidth: 240,
     minHeight: 120,
   },
   layout: {
@@ -19,15 +19,15 @@ export const CONFIG = {
   elk: {
     groupPadding: {
       top: 40,
-      left: 40,
+      left: 80,
       bottom: 40,
-      right: 40,
+      right: 80,
     },
     resourceNodeSpacing: 80,
     containerNodeSpacing: 160,
     containerLayerSpacing: 240,
-    edgeNudgingDistance: 16,
-    edgeCrossingPenalty: 100,
+    edgeSpacing: 20,
+    edgeEndpointClearance: 32,
     rootPadding: "[top=40,left=40,bottom=40,right=40]",
   },
 } as const;

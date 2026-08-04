@@ -4,7 +4,7 @@ import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
 import { resolveSymbol } from "../src/symbols/registry.js";
 import { renderDrawio } from "../src/render/drawio.js";
-import { layoutWithElk, separateRouteLanes } from "../src/layout/elk.js";
+import { enforceGlobalEdgeSpacing, layoutWithElk } from "../src/layout/elk.js";
 import { CONFIG } from "../src/config.js";
 
 test("requires namespaces and resolves aliases", () => {
@@ -49,6 +49,10 @@ R:sender --> B:queue`);
     const routed = layout.edges[0]!;
     assert.ok(Math.abs(routed.targetPoint!.x - (queue.x + queue.width / 2)) < 0.001);
     assert.ok(Math.abs(routed.targetPoint!.y - (queue.y + queue.height)) < 0.001);
+    const points = [routed.sourcePoint!, ...routed.points, routed.targetPoint!];
+    const distance = (first: { x: number; y: number }, second: { x: number; y: number }): number => Math.abs(first.x - second.x) + Math.abs(first.y - second.y);
+    assert.ok(distance(points[0]!, points[1]!) >= CONFIG.elk.edgeEndpointClearance);
+    assert.ok(distance(points.at(-2)!, points.at(-1)!) >= CONFIG.elk.edgeEndpointClearance);
 
     const xml = renderDrawio(layout.nodes, layout.edges);
     assert.match(xml, /exitX=1\.0000;exitY=0\.5000/);
@@ -233,18 +237,24 @@ source --> target`);
     }
 });
 
-test("post-routing lanes separate shared corridors from different routing passes", () => {
+test("global edge spacing separates close route segments from different routing passes", () => {
     const edges = [
         { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
         { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
     ];
     const routes = new Map([
         ["first", { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 50 }, { x: 200, y: 50 }], targetPoint: { x: 200, y: 100 } }],
-        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 50 }, { x: 180, y: 50 }], targetPoint: { x: 180, y: 100 } }],
+        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 62 }, { x: 180, y: 62 }], targetPoint: { x: 180, y: 100 } }],
     ]);
-    separateRouteLanes([], edges, routes);
-    const second = routes.get("second")!;
-    assert.ok(second.bendPoints.some((point) => point.y !== 50));
+
+    enforceGlobalEdgeSpacing([], edges, routes);
+
+    const horizontalSegmentY = (route: { sourcePoint: { x: number; y: number }; bendPoints: { x: number; y: number }[]; targetPoint: { x: number; y: number } }): number => {
+        const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
+        const segment = points.find((point, index) => index > 0 && Math.abs(point.x - points[index - 1]!.x) >= 100 && point.y === points[index - 1]!.y);
+        return segment!.y;
+    };
+    assert.ok(Math.abs(horizontalSegmentY(routes.get("first")!) - horizontalSegmentY(routes.get("second")!)) >= CONFIG.elk.edgeSpacing);
 });
 
 test("container-scoped ELK direction controls local layered layout", async () => {
