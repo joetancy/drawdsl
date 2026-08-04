@@ -60,6 +60,14 @@ test("formatter uses four-space indentation", () => {
     assert.match(formatted, /\n {4}aws:lambda fn\n/);
 });
 
+test("core text nodes may omit an ID", () => {
+    const ast = parseDsl('core:text "First note"\ncore:text "Second note"');
+    assert.deepEqual(ast.nodes.map((node) => node.label), ["First note", "Second note"]);
+    assert.match(ast.nodes[0]?.id ?? "", /^__core_text_\d+$/);
+    assert.match(ast.nodes[1]?.id ?? "", /^__core_text_\d+$/);
+    assert.notEqual(ast.nodes[0]?.id, ast.nodes[1]?.id);
+});
+
 test("provider styles retain fully qualified draw.io shapes", () => {
     const { ref, definition } = resolveSymbol({ namespace: "aws", name: "sns" });
     const result = renderDrawio([{ id: "topic", symbol: ref, definition, label: "SNS", x: 0, y: 0, width: 80, height: 80, declarationOrder: 0 }], []);

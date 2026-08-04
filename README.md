@@ -77,6 +77,8 @@ Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted
 | `core:layout` | Invisible structural container for ELK layout |
 | `core:spacer` | Anonymous invisible, icon-sized layout gap |
 
+`core:text` may omit its ID when it is only an annotation: `core:text "Deployment notes"`. DrawDSL assigns it an internal ID automatically. Supply an ID when the text node needs to be referenced by an edge.
+
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
 
 Use `core:image` with a quoted HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; its displayed label is intentionally empty.

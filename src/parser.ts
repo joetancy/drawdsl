@@ -147,7 +147,8 @@ export function parseDsl(source: string): DocumentAst {
         if (!opensBlock && container) throw new Error(`Line ${lineNumber}: container ${symbol.ref.name} must open a block with {`);
 
         let id = explicitId ?? symbol.ref.name;
-        if (!explicitId && symbol.definition.render === false) {
+        const anonymousText = symbol.ref.namespace === "core" && symbol.ref.name === "text";
+        if (!explicitId && (symbol.definition.render === false || anonymousText)) {
             do {
                 anonymousNodeCount += 1;
                 id = `__${symbol.ref.namespace}_${symbol.ref.name}_${anonymousNodeCount}`;
