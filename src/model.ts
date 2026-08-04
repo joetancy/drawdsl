@@ -1,5 +1,5 @@
 export type Direction = "right" | "left" | "down" | "up";
-export type LayoutEngine = "elk" | "dagre";
+export type NodeSide = "top" | "right" | "bottom" | "left";
 export type EdgeOperator = "-->" | "-.->" | "---" | "-.-" | "<-->" | "<-.->";
 export type SymbolRole = "resource" | "container" | "annotation";
 
@@ -51,6 +51,8 @@ export type AstEdge = {
     id: string;
     source: string;
     target: string;
+    sourceSide?: NodeSide;
+    targetSide?: NodeSide;
     operator: EdgeOperator;
     label?: string;
     declarationOrder: number;
@@ -58,7 +60,6 @@ export type AstEdge = {
 
 export type DocumentAst = {
     direction: Direction;
-    layoutEngine: LayoutEngine;
     nodes: AstNode[];
     edges: AstEdge[];
 };

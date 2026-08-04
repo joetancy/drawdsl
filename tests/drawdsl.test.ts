@@ -12,6 +12,7 @@ test("requires namespaces and resolves aliases", () => {
     assert.equal(ast.nodes[0]?.symbol.name, "apigateway");
     assert.equal(ast.edges.length, 1);
     assert.throws(() => parseDsl("lambda handler"), /must be namespaced/);
+    assert.doesNotThrow(() => parseDsl("layout elk\naws:lambda handler"));
 });
 
 test("supports bidirectional solid and dashed connections", () => {
@@ -31,6 +32,27 @@ test("supports bidirectional solid and dashed connections", () => {
     );
     assert.match(xml, /startArrow=block/);
     assert.match(xml, /endArrow=block/);
+});
+
+test("edge endpoint selectors pin routes to a node side", async () => {
+    const ast = parseDsl(`aws:lambda sender
+aws:sqs queue
+R:sender --> B:queue`);
+    const edge = ast.edges[0]!;
+    assert.equal(edge.source, "sender");
+    assert.equal(edge.target, "queue");
+    assert.equal(edge.sourceSide, "right");
+    assert.equal(edge.targetSide, "bottom");
+
+    const layout = await layoutWithElk(ast);
+    const queue = layout.nodes.find((node) => node.id === "queue")!;
+    const routed = layout.edges[0]!;
+    assert.ok(Math.abs(routed.targetPoint!.x - (queue.x + queue.width / 2)) < 0.001);
+    assert.ok(Math.abs(routed.targetPoint!.y - (queue.y + queue.height)) < 0.001);
+
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    assert.match(xml, /exitX=1\.0000;exitY=0\.5000/);
+    assert.match(xml, /entryX=0\.5000;entryY=1\.0000/);
 });
 
 test("formatter uses four-space indentation", () => {
@@ -97,8 +119,7 @@ test("AWS cloud and VPC groups keep their borders", () => {
 });
 
 test("layout-only grids accept connected children and stay invisible in draw.io", async () => {
-    const ast = parseDsl(`layout elk
-core:group workers {
+    const ast = parseDsl(`core:group workers {
     core:layout columns {
         grid-columns 2
         node-spacing 140
@@ -114,7 +135,6 @@ worker_a --> worker_d`);
     assert.equal(columns?.definition.layoutOnly, true);
     assert.throws(() => parseDsl("grid-columns 3"), /must be inside a container/);
     assert.throws(() => parseDsl("core:group workers {\n    grid-columns 2\n}"), /requires at least one child/);
-    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    grid-columns 2\n}"), /only supported with layout elk/);
     assert.throws(() => parseDsl("core:layout structure {\n    aws:lambda worker\n}\nstructure --> worker"), /Layout-only container cannot be an edge endpoint/);
 
     const layout = await layoutWithElk(ast);
@@ -145,8 +165,7 @@ worker_a --> worker_d`);
 });
 
 test("grid columns preserve declaration order and center mixed-size groups", async () => {
-    const ast = parseDsl(`layout elk
-core:layout application_grid {
+    const ast = parseDsl(`core:layout application_grid {
     grid-columns 3
     core:layout left {
         grid-columns 1
@@ -176,8 +195,7 @@ core:layout application_grid {
 });
 
 test("Libavoid routes around unrelated visible containers", async () => {
-    const ast = parseDsl(`layout elk
-core:layout row {
+    const ast = parseDsl(`core:layout row {
     grid-columns 3
     core:group left {
         aws:lambda source
@@ -222,8 +240,7 @@ test("post-routing lanes separate shared corridors from different routing passes
 });
 
 test("container-scoped ELK direction controls local layered layout", async () => {
-    const ast = parseDsl(`layout elk
-direction right
+    const ast = parseDsl(`direction right
 core:group workers {
     direction down
     aws:lambda first
@@ -238,8 +255,6 @@ core:group workers {
     assert.ok(first.y < second.y);
 
     assert.throws(() => parseDsl("core:group workers {\n    direction down\n    direction right\n}"), /direction is already set/);
-    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    direction down\n}"), /container direction is only supported with layout elk/);
     assert.throws(() => parseDsl("core:group workers {\n    layer-bound 2\n}"), /unsupported syntax/);
     assert.throws(() => parseDsl("node-spacing 140"), /must be inside a container/);
-    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    node-spacing 140\n}"), /only supported with layout elk/);
 });

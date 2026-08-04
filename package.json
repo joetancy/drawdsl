@@ -11,14 +11,11 @@
     "lint:ts": "eslint \"**/*.ts\"",
     "format:ts": "eslint \"**/*.ts\" --fix",
     "example": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
-    "example:elk": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
-    "example:dagre": "node --import tsx src/drawdsl.ts examples/dagre.drawdsl examples/dagre.drawio",
-    "examples": "npm run example:elk && npm run example:dagre",
+    "examples": "npm run example",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^3.0.0",
     "@mr_mint/elkjs-libavoid": "^0.5.0",
     "elkjs": "0.11.1"
   },

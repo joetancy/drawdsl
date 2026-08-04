@@ -56,4 +56,3 @@ export function sharedContainerOrigin(source: string, target: string, layoutNode
 }
 
 export function elkDirection(direction: DocumentAst["direction"]): string { return { right: "RIGHT", left: "LEFT", down: "DOWN", up: "UP" }[direction]; }
-export function dagreDirection(direction: DocumentAst["direction"]): string { return { right: "LR", left: "RL", down: "TB", up: "BT" }[direction]; }

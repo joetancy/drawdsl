@@ -1,4 +1,4 @@
-import { isRenderable, type FlatLayoutNode, type Point, type RoutedEdge } from "../model.js";
+import { isRenderable, type FlatLayoutNode, type NodeSide, type Point, type RoutedEdge } from "../model.js";
 
 function xmlEscape(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
@@ -23,11 +23,17 @@ function nodeStyle(node: FlatLayoutNode): string {
     return styleString(["sketch=0", "outlineConnect=0", "fontColor=#232F3E", "gradientColor=none", `fillColor=${drawio.fill ?? "#527FFF"}`, `strokeColor=${drawio.stroke ?? "#ffffff"}`, "dashed=0", "verticalLabelPosition=bottom", "verticalAlign=top", "align=center", "html=1", "fontSize=12", "fontStyle=0", "aspect=fixed", "pointerEvents=1", `shape=${drawio.shape}`, ...(drawio.resIcon ? [`resIcon=${drawio.resIcon}`] : []), ...(drawio.styles ?? [])]);
 }
 
-function attachment(prefix: "exit" | "entry", point: Point | undefined, node: FlatLayoutNode | undefined): string[] {
-    if (!point || !node) return [];
+function attachment(prefix: "exit" | "entry", point: Point | undefined, node: FlatLayoutNode | undefined, side?: NodeSide): string[] {
+    if (!node) return [];
     const clamp = (value: number): number => Math.max(0, Math.min(1, value));
-    const x = clamp((point.x - node.x) / node.width).toFixed(4);
-    const y = clamp((point.y - node.y) / node.height).toFixed(4);
+    const sidePoint = side === "top" ? { x: 0.5, y: 0 }
+        : side === "right" ? { x: 1, y: 0.5 }
+            : side === "bottom" ? { x: 0.5, y: 1 }
+                : side === "left" ? { x: 0, y: 0.5 }
+                    : undefined;
+    if (!sidePoint && !point) return [];
+    const x = (sidePoint?.x ?? clamp((point!.x - node.x) / node.width)).toFixed(4);
+    const y = (sidePoint?.y ?? clamp((point!.y - node.y) / node.height)).toFixed(4);
     return [`${prefix}X=${x}`, `${prefix}Y=${y}`, `${prefix}Perimeter=1`];
 }
 
@@ -36,7 +42,7 @@ function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string
     const directed = operator === "-->" || operator === "-.->" || operator === "<-->" || operator === "<-.->";
     const bidirectional = operator === "<-->" || operator === "<-.->";
     const dashed = operator === "-.->" || operator === "-.-" || operator === "<-.->";
-    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source)), ...attachment("entry", edge.targetPoint, nodes.get(edge.target))]);
+    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
 }
 
 export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {

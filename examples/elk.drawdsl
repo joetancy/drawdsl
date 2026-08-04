@@ -1,5 +1,4 @@
-# ELK is the default and provides hierarchy-aware orthogonal routing.
-layout elk
+# ELK provides hierarchy-aware orthogonal routing.
 direction right
 
 aws:internet internet "Public internet"

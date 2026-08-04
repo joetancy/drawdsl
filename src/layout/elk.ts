@@ -1,6 +1,6 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import { routeEdges } from "@mr_mint/elkjs-libavoid";
-import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api.js";
+import type { ElkExtendedEdge, ElkNode, ElkPort } from "elkjs/lib/elk-api.js";
 import { CONFIG } from "../config.js";
 import { isContainer, isLayoutOnly, isRenderable, type AstEdge, type AstNode, type DocumentAst, type FlatLayoutNode, type LayoutResult, type Point, type RoutedEdge } from "../model.js";
 import { byDeclarationOrder, dimensions, elkDirection, flattenAst, simplifyWaypoints } from "./common.js";
@@ -189,6 +189,23 @@ type Segment = {
     horizontal: boolean;
 };
 
+function portId(nodeId: string, side: NonNullable<AstEdge["sourceSide"]>): string {
+    return `__drawdsl_${nodeId}_${side}_port`;
+}
+
+function portsFor(node: FlatLayoutNode, edges: AstEdge[]): ElkPort[] {
+    const sides = new Set<NonNullable<AstEdge["sourceSide"]>>();
+    for (const edge of edges) {
+        if (edge.source === node.id && edge.sourceSide) sides.add(edge.sourceSide);
+        if (edge.target === node.id && edge.targetSide) sides.add(edge.targetSide);
+    }
+    return [...sides].map((side) => {
+        const x = side === "left" ? 0 : side === "right" ? node.width : node.width / 2;
+        const y = side === "top" ? 0 : side === "bottom" ? node.height : node.height / 2;
+        return { id: portId(node.id, side), x, y, width: 0, height: 0 };
+    });
+}
+
 function visibleContainerAncestors(id: string, nodesById: Map<string, FlatLayoutNode>): Set<string> {
     const result = new Set<string>();
     let current = nodesById.get(id);
@@ -240,8 +257,17 @@ function routingGraph(nodes: FlatLayoutNode[], group: RoutingGroup): ElkNode {
         y: node.y,
         width: node.width,
         height: node.height,
+        ports: portsFor(node, group.edges),
     }));
-    return { id: "root", children, edges: group.edges.map((edge) => ({ id: edge.id, sources: [edge.source], targets: [edge.target] })) };
+    return {
+        id: "root",
+        children,
+        edges: group.edges.map((edge) => ({
+            id: edge.id,
+            sources: [edge.sourceSide ? portId(edge.source, edge.sourceSide) : edge.source],
+            targets: [edge.targetSide ? portId(edge.target, edge.targetSide) : edge.target],
+        })),
+    };
 }
 
 async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEdge[]): Promise<Map<string, Route>> {

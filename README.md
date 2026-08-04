@@ -2,7 +2,7 @@
 
 > A vibe-coded 🧑‍💻 architecture DSL that turns infrastructure ideas into editable draw.io diagrams 📐
 
-`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, ELK orthogonal routing, and Dagre layered layouts.
+`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, and ELK orthogonal routing.
 
 ## Quick start
 
@@ -13,20 +13,19 @@ npm run generate -- examples/elk.drawdsl output.drawio
 
 Open `output.drawio` in [diagrams.net](https://www.diagrams.net/) or draw.io Desktop. Generated nodes, groups, labels, and connectors remain editable.
 
-Try both layout engines:
+Generate the bundled example:
 
 ```bash
 npm run examples
 ```
 
-This generates the bundled ELK and Dagre examples in `examples/`.
+This generates the bundled architecture example in `examples/`.
 
-The examples use the same multi-tier architecture with an AWS Region, nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles. This makes the ELK/Dagre layout differences visible on a more realistic graph.
+The example uses a multi-tier architecture with an AWS Region, nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles.
 
 ## A tiny example
 
 ```text
-layout elk
 direction right
 
 aws:internet internet "Public internet"
@@ -54,6 +53,15 @@ source -.- target       # undirected, dashed
 source <--> target      # bidirectional, solid
 source <-.-> target     # bidirectional, dashed
 ```
+
+Pin either end of an edge to a particular side by prefixing the endpoint ID with `T:`, `R:`, `B:`, or `L:`:
+
+```text
+lambda_main --> B:notifications_queue  # enter the queue from its bottom
+R:lambda_main --> T:notifications_queue
+```
+
+These selectors mean top, right, bottom, and left respectively. They are honored by ELK’s router and preserved in draw.io.
 
 Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted labels. Unqualified declarations such as `lambda handler` are intentionally rejected.
 
@@ -116,9 +124,9 @@ api --> jobs
 worker --> records
 ```
 
-`grid-columns` applies to a container’s direct children and is supported with `layout elk`. Child subtrees are first sized, then placed into an exact declaration-ordered grid. Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
+`grid-columns` applies to a container’s direct children. Child subtrees are first sized, then placed into an exact declaration-ordered grid. Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
 
-Use `node-spacing` inside an ELK container to override its direct-child gap without changing the global defaults:
+Use `node-spacing` inside a container to override its direct-child gap without changing the global defaults:
 
 ```text
 core:layout application_grid {
@@ -127,7 +135,7 @@ core:layout application_grid {
 }
 ```
 
-ELK containers can also override the document flow direction for their non-grid children:
+Containers can also override the document flow direction for their non-grid children:
 
 ```text
 core:group workers {
@@ -145,11 +153,7 @@ Global ELK layout defaults are in `src/config.ts`. `edgeNudgingDistance` control
 
 ```text
 direction right   # right, left, down, or up
-layout elk        # elk or dagre
 ```
-
-- **ELK** is the default. It supports layout-only grids, hierarchy-aware placement, and Libavoid orthogonal routing.
-- **Dagre** provides a compact layered arrangement with simpler connector routing.
 
 ## Commands
 

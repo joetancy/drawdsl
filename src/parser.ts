@@ -1,9 +1,9 @@
-import { isRenderable, type AstEdge, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type LayoutEngine, type SymbolRef } from "./model.js";
+import { isRenderable, type AstEdge, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type NodeSide, type SymbolRef } from "./model.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
-const EDGE_RE = /^([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
+const EDGE_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
-const LAYOUT_RE = /^layout\s+(elk|dagre)$/;
+const DEFAULT_LAYOUT_RE = /^layout\s+elk$/;
 const GRID_COLUMNS_RE = /^grid-columns\s+([1-9]\d*)$/;
 const NODE_SPACING_RE = /^node-spacing\s+([1-9]\d*)$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;
@@ -43,6 +43,12 @@ function unquoteLabel(value?: string): string | undefined {
         : trimmed;
 }
 
+function nodeSide(value: string | undefined): NodeSide | undefined {
+    if (!value) return undefined;
+    const sides: Record<"T" | "R" | "B" | "L", NodeSide> = { T: "top", R: "right", B: "bottom", L: "left" };
+    return sides[value.toUpperCase() as keyof typeof sides];
+}
+
 function parseSymbol(raw: string, lineNumber: number): { ref: SymbolRef; definition: ReturnType<typeof resolveSymbol>["definition"] } {
     const match = raw.match(/^([^:]+):(.+)$/);
     if (!match) {
@@ -60,7 +66,6 @@ export function parseDsl(source: string): DocumentAst {
     const stack: AstNode[] = [];
     const ids = new Set<string>();
     let direction: Direction = "right";
-    let layoutEngine: LayoutEngine = "elk";
     let order = 0;
     let anonymousNodeCount = 0;
 
@@ -80,6 +85,10 @@ export function parseDsl(source: string): DocumentAst {
             stack.pop();
             continue;
         }
+        if (DEFAULT_LAYOUT_RE.test(line)) {
+            if (stack.length) throw new Error(`Line ${lineNumber}: layout must be top-level`);
+            continue;
+        }
         const directionMatch = line.match(DIRECTION_RE);
         if (directionMatch) {
             const container = stack.at(-1);
@@ -88,12 +97,6 @@ export function parseDsl(source: string): DocumentAst {
                 if (container.direction !== undefined) throw new Error(`Line ${lineNumber}: direction is already set for container ${container.id}`);
                 container.direction = directionMatch[1] as Direction;
             }
-            continue;
-        }
-        const layoutMatch = line.match(LAYOUT_RE);
-        if (layoutMatch) {
-            if (stack.length) throw new Error(`Line ${lineNumber}: layout must be top-level`);
-            layoutEngine = layoutMatch[1] as LayoutEngine;
             continue;
         }
         const gridColumnsMatch = line.match(GRID_COLUMNS_RE);
@@ -115,11 +118,13 @@ export function parseDsl(source: string): DocumentAst {
         const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
             edges.push({
-                id: `edge_${edges.length + 1}_${edgeMatch[1]}_${edgeMatch[3]}`,
-                source: edgeMatch[1]!,
-                target: edgeMatch[3]!,
-                operator: edgeMatch[2] as EdgeOperator,
-                label: unquoteLabel(edgeMatch[4]),
+                id: `edge_${edges.length + 1}_${edgeMatch[2]}_${edgeMatch[5]}`,
+                source: edgeMatch[2]!,
+                target: edgeMatch[5]!,
+                sourceSide: nodeSide(edgeMatch[1]),
+                targetSide: nodeSide(edgeMatch[4]),
+                operator: edgeMatch[3] as EdgeOperator,
+                label: unquoteLabel(edgeMatch[6]),
                 declarationOrder: order++,
             });
             continue;
@@ -189,16 +194,8 @@ export function parseDsl(source: string): DocumentAst {
             containers.push(...container.children);
             continue;
         }
-        if (layoutEngine !== "elk") throw new Error(`grid-columns is only supported with layout elk (container ${container.id})`);
         if (!container.children.length) throw new Error(`grid-columns requires at least one child (container ${container.id})`);
         containers.push(...container.children);
     }
-    const spacingContainers = [...rootNodes];
-    while (spacingContainers.length) {
-        const container = spacingContainers.pop()!;
-        if (container.nodeSpacing !== undefined && layoutEngine !== "elk") throw new Error(`node-spacing is only supported with layout elk (container ${container.id})`);
-        if (container.direction !== undefined && layoutEngine !== "elk") throw new Error(`container direction is only supported with layout elk (container ${container.id})`);
-        spacingContainers.push(...container.children);
-    }
-    return { direction, layoutEngine, nodes: rootNodes, edges };
+    return { direction, nodes: rootNodes, edges };
 }
