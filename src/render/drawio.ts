@@ -1,4 +1,4 @@
-import type { EdgeOperator, FlatLayoutNode, RoutedEdge } from "../model.js";
+import { isLayoutOnly, type FlatLayoutNode, type Point, type RoutedEdge } from "../model.js";
 
 function xmlEscape(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
@@ -7,6 +7,9 @@ function styleString(tokens: readonly string[]): string { return `${tokens.join(
 
 function nodeStyle(node: FlatLayoutNode): string {
     const drawio = node.definition.drawio;
+    if (node.symbol.namespace === "core" && node.symbol.name === "image") {
+        return styleString(["shape=image", "imageAspect=0", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
+    }
     if (node.definition.role === "container") {
         return styleString([
             "points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]]",
@@ -20,11 +23,20 @@ function nodeStyle(node: FlatLayoutNode): string {
     return styleString(["sketch=0", "outlineConnect=0", "fontColor=#232F3E", "gradientColor=none", `fillColor=${drawio.fill ?? "#527FFF"}`, `strokeColor=${drawio.stroke ?? "#ffffff"}`, "dashed=0", "verticalLabelPosition=bottom", "verticalAlign=top", "align=center", "html=1", "fontSize=12", "fontStyle=0", "aspect=fixed", "pointerEvents=1", `shape=${drawio.shape}`, ...(drawio.resIcon ? [`resIcon=${drawio.resIcon}`] : []), ...(drawio.styles ?? [])]);
 }
 
-function edgeStyle(operator: EdgeOperator): string {
+function attachment(prefix: "exit" | "entry", point: Point | undefined, node: FlatLayoutNode | undefined): string[] {
+    if (!point || !node) return [];
+    const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+    const x = clamp((point.x - node.x) / node.width).toFixed(4);
+    const y = clamp((point.y - node.y) / node.height).toFixed(4);
+    return [`${prefix}X=${x}`, `${prefix}Y=${y}`, `${prefix}Perimeter=1`];
+}
+
+function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string {
+    const { operator } = edge;
     const directed = operator === "-->" || operator === "-.->" || operator === "<-->" || operator === "<-.->";
     const bidirectional = operator === "<-->" || operator === "<-.->";
     const dashed = operator === "-.->" || operator === "-.-" || operator === "<-.->";
-    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`]);
+    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source)), ...attachment("entry", edge.targetPoint, nodes.get(edge.target))]);
 }
 
 export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
@@ -35,16 +47,22 @@ export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): stri
         '    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
         "      <root>", '        <mxCell id="0"/>', '        <mxCell id="1" parent="0"/>',
     ];
-    const ordered = [...nodes].sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
+    const ordered = nodes.filter((node) => !isLayoutOnly(node)).sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
     const byId = new Map(nodes.map((node) => [node.id, node]));
+    const parentFor = (node: FlatLayoutNode): FlatLayoutNode | undefined => {
+        let parent = node.parentId ? byId.get(node.parentId) : undefined;
+        while (parent && isLayoutOnly(parent)) parent = parent.parentId ? byId.get(parent.parentId) : undefined;
+        return parent;
+    };
     for (const node of ordered) {
-        const parent = node.parentId ?? "1"; const parentNode = node.parentId ? byId.get(node.parentId) : undefined;
+        const parentNode = parentFor(node); const parent = parentNode?.id ?? "1";
         const x = parentNode ? node.x - parentNode.x : node.x; const y = parentNode ? node.y - parentNode.y : node.y;
-        lines.push(`        <mxCell id="${xmlEscape(node.id)}" value="${xmlEscape(node.label)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
+        const value = node.symbol.namespace === "core" && node.symbol.name === "image" ? "" : node.label;
+        lines.push(`        <mxCell id="${xmlEscape(node.id)}" value="${xmlEscape(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
         lines.push(`          <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "        </mxCell>");
     }
     for (const edge of edges) {
-        lines.push(`        <mxCell id="${xmlEscape(edge.id)}" value="${xmlEscape(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge.operator))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '          <mxGeometry relative="1" as="geometry">');
+        lines.push(`        <mxCell id="${xmlEscape(edge.id)}" value="${xmlEscape(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '          <mxGeometry relative="1" as="geometry">');
         if (edge.points.length) {
             lines.push('            <Array as="points">');
             for (const point of edge.points) lines.push(`              <mxPoint x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}"/>`);

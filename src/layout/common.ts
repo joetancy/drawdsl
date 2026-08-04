@@ -2,6 +2,7 @@ import { CONFIG } from "../config.js";
 import type { AstNode, DocumentAst, FlatLayoutNode, Point } from "../model.js";
 
 export function dimensions(node: AstNode): { width: number; height: number } {
+    if (node.definition.layoutOnly) return { width: 1, height: 1 };
     if (node.definition.role === "container") return { width: CONFIG.container.minWidth, height: CONFIG.container.minHeight };
     if (node.definition.role === "annotation") {
         const lines = node.label.split("\n");

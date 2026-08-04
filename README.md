@@ -2,7 +2,7 @@
 
 > A vibe-coded 🧑‍💻 architecture DSL that turns infrastructure ideas into editable draw.io diagrams 📐
 
-`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text and groups, ELK orthogonal routing, and Dagre layered layouts.
+`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, ELK orthogonal routing, and Dagre layered layouts.
 
 ## Quick start
 
@@ -61,10 +61,18 @@ Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted
 | --- | --- |
 | `aws:*` | AWS resource icons, AWS shapes, and AWS containers |
 | `core:text` | Editable text annotation |
+| `core:image` | Image loaded from an HTTP(S) URL |
 | `core:box` | Generic editable resource box |
 | `core:group` | Provider-neutral container |
+| `core:layout` | Invisible structural container for ELK layout |
 
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
+
+Use `core:image` with a quoted HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; its displayed label is intentionally empty.
+
+```text
+core:image architecture_reference "https://example.com/architecture.png"
+```
 
 Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/symbols/core.ts](src/symbols/core.ts). To add another icon family, implement a `SymbolProvider` and register it in [src/symbols/registry.ts](src/symbols/registry.ts). Parsing, layout, and rendering consume the shared symbol model, so provider-specific details stay isolated.
 
@@ -72,12 +80,41 @@ Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/s
 
 AWS containers include `aws:cloud`, `aws:vpc`, `aws:subnet`, `aws:private_subnet`, `aws:public_subnet`, and `aws:az`. `core:group` provides a neutral alternative. Containers use braces and can be nested.
 
+Use `core:layout` for an invisible, structural container. It affects placement but does not create a draw.io cell, border, or label. This is useful when the visual architecture needs stable columns or grids without introducing another visible group.
+
+```text
+aws:vpc application {
+    core:layout application_grid {
+        grid-columns 2
+
+        core:layout compute_column {
+            grid-columns 1
+            aws:lambda api
+            aws:lambda worker
+        }
+
+        core:layout data_column {
+            grid-columns 1
+            aws:sqs jobs
+            aws:dynamodb records
+        }
+    }
+}
+
+api --> jobs
+worker --> records
+```
+
+`grid-columns` applies to a container’s direct children and is supported with `layout elk`. Child subtrees are first sized, then placed into an exact declaration-ordered grid. Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
+
+This keeps the two concerns separate: ELK positions the hierarchy and Libavoid routes the completed geometry with orthogonal, obstacle-aware connectors. For each edge group, visible containers unrelated to either endpoint become routing obstacles; the source and destination ancestor containers stay traversable so connections can still enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points, so edge origins are spread across resource boundaries instead of all leaving from a single side.
+
 ```text
 direction right   # right, left, down, or up
 layout elk        # elk or dagre
 ```
 
-- **ELK** is the default. It provides hierarchy-aware orthogonal routing and editable bendpoints.
+- **ELK** is the default. It supports layout-only grids, hierarchy-aware placement, and Libavoid orthogonal routing.
 - **Dagre** provides a compact layered arrangement with simpler connector routing.
 
 ## Commands

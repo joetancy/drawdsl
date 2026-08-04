@@ -21,6 +21,14 @@ export const coreProvider: SymbolProvider = {
                 ],
             },
         },
+        image: {
+            role: "resource",
+            widthScale: 2,
+            drawio: {
+                shape: "image",
+                styles: ["imageAspect=0", "aspect=fixed", "html=1"],
+            },
+        },
         group: {
             role: "container",
             drawio: {
@@ -28,6 +36,13 @@ export const coreProvider: SymbolProvider = {
                 fill: "none",
                 stroke: "#879196",
                 styles: ["rounded=1", "fontColor=#232F3E"],
+            },
+        },
+        layout: {
+            role: "container",
+            layoutOnly: true,
+            drawio: {
+                shape: "rectangle",
             },
         },
         box: {

@@ -3,6 +3,7 @@ layout dagre
 direction right
 
 aws:internet internet "Public internet"
+core:image reference_image "https://placehold.co/320x200/png?text=External+image"
 
 aws:cloud cloud "AWS Cloud" {
     aws:vpc app_vpc "Application VPC" {

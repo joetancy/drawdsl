@@ -4,6 +4,7 @@ import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 const EDGE_RE = /^([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const LAYOUT_RE = /^layout\s+(elk|dagre)$/;
+const GRID_COLUMNS_RE = /^grid-columns\s+([1-9]\d*)$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
@@ -89,6 +90,14 @@ export function parseDsl(source: string): DocumentAst {
             layoutEngine = layoutMatch[1] as LayoutEngine;
             continue;
         }
+        const gridColumnsMatch = line.match(GRID_COLUMNS_RE);
+        if (gridColumnsMatch) {
+            const container = stack.at(-1);
+            if (!container) throw new Error(`Line ${lineNumber}: grid-columns must be inside a container`);
+            if (container.gridColumns !== undefined) throw new Error(`Line ${lineNumber}: grid-columns is already set for container ${container.id}`);
+            container.gridColumns = Number(gridColumnsMatch[1]);
+            continue;
+        }
         const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
             edges.push({
@@ -136,9 +145,29 @@ export function parseDsl(source: string): DocumentAst {
         if (opensBlock) stack.push(node);
     }
     if (stack.length) throw new Error(`Unclosed container: ${stack.at(-1)!.id}`);
+    const nodesById = new Map<string, AstNode>();
+    const pendingNodes = [...rootNodes];
+    while (pendingNodes.length) {
+        const node = pendingNodes.pop()!;
+        nodesById.set(node.id, node);
+        pendingNodes.push(...node.children);
+    }
     for (const edge of edges) {
         if (!ids.has(edge.source)) throw new Error(`Unknown edge source: ${edge.source}`);
         if (!ids.has(edge.target)) throw new Error(`Unknown edge target: ${edge.target}`);
+        if (nodesById.get(edge.source)?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.source}`);
+        if (nodesById.get(edge.target)?.definition.layoutOnly) throw new Error(`Layout-only container cannot be an edge endpoint: ${edge.target}`);
+    }
+    const containers = [...rootNodes];
+    while (containers.length) {
+        const container = containers.pop()!;
+        if (container.gridColumns === undefined) {
+            containers.push(...container.children);
+            continue;
+        }
+        if (layoutEngine !== "elk") throw new Error(`grid-columns is only supported with layout elk (container ${container.id})`);
+        if (!container.children.length) throw new Error(`grid-columns requires at least one child (container ${container.id})`);
+        containers.push(...container.children);
     }
     return { direction, layoutEngine, nodes: rootNodes, edges };
 }

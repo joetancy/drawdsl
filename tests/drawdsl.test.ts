@@ -4,6 +4,8 @@ import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
 import { resolveSymbol } from "../src/symbols/registry.js";
 import { renderDrawio } from "../src/render/drawio.js";
+import { layoutWithElk } from "../src/layout/elk.js";
+import { CONFIG } from "../src/config.js";
 
 test("requires namespaces and resolves aliases", () => {
     const ast = parseDsl('aws:apigw gateway "Gateway"\ncore:text note "Hello"\n gateway --> note');
@@ -46,9 +48,130 @@ test("provider styles retain fully qualified draw.io shapes", () => {
     assert.equal(sqs.definition.drawio.resIcon, "mxgraph.aws4.sqs");
 });
 
+test("core images render as image cells without a visible label", () => {
+    const ast = parseDsl('core:image reference "https://example.com/reference.png"');
+    const image = ast.nodes[0]!;
+    const xml = renderDrawio([{ id: image.id, symbol: image.symbol, definition: image.definition, label: image.label, x: 0, y: 0, width: 160, height: 80, declarationOrder: 0 }], []);
+    assert.match(xml, /shape=image/);
+    assert.match(xml, /image=https:\/\/example.com\/reference.png/);
+    assert.match(xml, /value=""/);
+});
+
 test("AWS cloud and VPC groups keep their borders", () => {
     const cloud = resolveSymbol({ namespace: "aws", name: "cloud" }).definition;
     const vpc = resolveSymbol({ namespace: "aws", name: "vpc" }).definition;
     assert.equal(cloud.drawio.styles?.includes("grStroke=0"), false);
     assert.equal(vpc.drawio.styles?.includes("grStroke=0"), false);
+});
+
+test("layout-only grids accept connected children and stay invisible in draw.io", async () => {
+    const ast = parseDsl(`layout elk
+core:group workers {
+    core:layout columns {
+        grid-columns 2
+        aws:lambda worker_a
+        aws:lambda worker_b
+        aws:lambda worker_c
+        aws:lambda worker_d
+    }
+}
+worker_a --> worker_d`);
+    const columns = ast.nodes[0]?.children[0];
+    assert.equal(columns?.gridColumns, 2);
+    assert.equal(columns?.definition.layoutOnly, true);
+    assert.throws(() => parseDsl("grid-columns 3"), /must be inside a container/);
+    assert.throws(() => parseDsl("core:group workers {\n    grid-columns 2\n}"), /requires at least one child/);
+    assert.throws(() => parseDsl("layout dagre\ncore:group workers {\n    grid-columns 2\n}"), /only supported with layout elk/);
+    assert.throws(() => parseDsl("core:layout structure {\n    aws:lambda worker\n}\nstructure --> worker"), /Layout-only container cannot be an edge endpoint/);
+
+    const layout = await layoutWithElk(ast);
+    const workers = layout.nodes.filter((node) => node.parentId === "columns");
+    assert.equal(new Set(workers.map((node) => node.x)).size, 2);
+    assert.equal(new Set(workers.map((node) => node.y)).size, 2);
+    const group = layout.nodes.find((node) => node.id === "workers")!;
+    for (const worker of workers) {
+        assert.ok(worker.x >= group.x && worker.y >= group.y);
+        assert.ok(worker.x + worker.width <= group.x + group.width);
+        assert.ok(worker.y + worker.height <= group.y + group.height);
+    }
+    const route = layout.edges[0]!;
+    assert.ok(route.sourcePoint && route.targetPoint);
+    const routePoints = [route.sourcePoint!, ...route.points, route.targetPoint!];
+    for (let index = 1; index < routePoints.length; index += 1) {
+        const previous = routePoints[index - 1]!;
+        const current = routePoints[index]!;
+        assert.ok(previous.x === current.x || previous.y === current.y);
+    }
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    assert.doesNotMatch(xml, /id="columns"/);
+    assert.match(xml, /parent="workers"/);
+    assert.match(xml, /exitPerimeter=1/);
+});
+
+test("grid columns preserve declaration order and center mixed-size groups", async () => {
+    const ast = parseDsl(`layout elk
+core:layout application_grid {
+    grid-columns 3
+    core:layout left {
+        grid-columns 1
+        aws:lambda left_a
+    }
+    core:layout centre {
+        grid-columns 1
+        aws:lambda centre_a
+        aws:lambda centre_b
+        aws:lambda centre_c
+    }
+    core:layout right {
+        grid-columns 1
+        aws:lambda right_a
+        aws:lambda right_b
+    }
+}`);
+    const layout = await layoutWithElk(ast);
+    const left = layout.nodes.find((node) => node.id === "left")!;
+    const centre = layout.nodes.find((node) => node.id === "centre")!;
+    const right = layout.nodes.find((node) => node.id === "right")!;
+    assert.ok(left.x < centre.x && centre.x < right.x);
+    assert.equal(left.y + left.height / 2, centre.y + centre.height / 2);
+    assert.equal(centre.y + centre.height / 2, right.y + right.height / 2);
+    assert.equal(centre.x - (left.x + left.width), CONFIG.elk.containerNodeSpacing);
+    assert.equal(right.x - (centre.x + centre.width), CONFIG.elk.containerNodeSpacing);
+});
+
+test("Libavoid routes around unrelated visible containers", async () => {
+    const ast = parseDsl(`layout elk
+core:layout row {
+    grid-columns 3
+    core:group left {
+        aws:lambda source
+    }
+    core:group blocker {
+        aws:sqs obstacle
+    }
+    core:group right {
+        aws:lambda target
+    }
+}
+source --> target`);
+    const layout = await layoutWithElk(ast);
+    const blocker = layout.nodes.find((node) => node.id === "blocker")!;
+    const edge = layout.edges[0]!;
+    const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
+    const crossesInterior = (start: { x: number; y: number }, end: { x: number; y: number }): boolean => {
+        if (start.x === end.x) {
+            return start.x > blocker.x && start.x < blocker.x + blocker.width
+                && Math.max(start.y, end.y) > blocker.y && Math.min(start.y, end.y) < blocker.y + blocker.height;
+        }
+        return start.y > blocker.y && start.y < blocker.y + blocker.height
+            && Math.max(start.x, end.x) > blocker.x && Math.min(start.x, end.x) < blocker.x + blocker.width;
+    };
+    for (let index = 1; index < points.length; index += 1) {
+        assert.equal(crossesInterior(points[index - 1]!, points[index]!), false);
+    }
+});
+
+test("container-scoped direction and layer-bound are rejected", () => {
+    assert.throws(() => parseDsl("core:group workers {\n    direction down\n}"), /direction must be top-level/);
+    assert.throws(() => parseDsl("core:group workers {\n    layer-bound 2\n}"), /unsupported syntax/);
 });

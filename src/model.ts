@@ -19,6 +19,8 @@ export type DrawioSymbolStyle = {
 export type SymbolDefinition = {
     role: SymbolRole;
     drawio: DrawioSymbolStyle;
+    /** A structural container that participates in layout but is not rendered. */
+    layoutOnly?: boolean;
     widthScale?: number;
     heightScale?: number;
     defaultLabel?: string;
@@ -37,6 +39,7 @@ export type AstNode = {
     label: string;
     parentId?: string;
     children: AstNode[];
+    gridColumns?: number;
     declarationOrder: number;
 };
 
@@ -71,7 +74,11 @@ export type FlatLayoutNode = {
     declarationOrder: number;
 };
 
-export type RoutedEdge = AstEdge & { points: Point[] };
+export type RoutedEdge = AstEdge & {
+    points: Point[];
+    sourcePoint?: Point;
+    targetPoint?: Point;
+};
 
 export type LayoutResult = {
     nodes: FlatLayoutNode[];
@@ -84,4 +91,8 @@ export function symbolKey(ref: SymbolRef): string {
 
 export function isContainer(node: AstNode | FlatLayoutNode): boolean {
     return node.definition.role === "container";
+}
+
+export function isLayoutOnly(node: AstNode | FlatLayoutNode): boolean {
+    return node.definition.layoutOnly === true;
 }
