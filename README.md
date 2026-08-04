@@ -139,9 +139,9 @@ core:group workers {
 
 Container directions support `right`, `left`, `down`, and `up`. A strict `grid-columns` layout remains grid-ordered, so its direction is ignored.
 
-This keeps the two concerns separate: ELK positions the hierarchy and Libavoid routes the completed geometry with orthogonal, obstacle-aware connectors. For each edge group, visible containers unrelated to either endpoint become routing obstacles; the source and destination ancestor containers stay traversable so connections can still enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points, so edge origins are spread across resource boundaries instead of all leaving from a single side.
+This keeps the two concerns separate: ELK positions the hierarchy and Libavoid routes the completed geometry with orthogonal, obstacle-aware connectors. For each edge group, visible containers unrelated to either endpoint become routing obstacles; the source and destination ancestor containers stay traversable so connections can still enter and leave them. `core:layout` is never an obstacle. A final global lane pass then offsets shared internal segments and avoidable crossings when the adjusted path remains clear of that edge's obstacles. Draw.io receives the resulting bendpoints and attachment points, so edge origins are spread across resource boundaries instead of all leaving from a single side.
 
-Global ELK layout defaults are in `src/config.ts`. `edgeNudgingDistance` controls the spacing Libavoid aims to keep between parallel route segments; the default is `16` pixels.
+Global ELK layout defaults are in `src/config.ts`. `edgeNudgingDistance` controls the spacing Libavoid and the lane pass aim to keep between parallel route segments; `edgeCrossingPenalty` makes crossing an existing edge more expensive.
 
 ```text
 direction right   # right, left, down, or up

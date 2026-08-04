@@ -3,9 +3,9 @@ export const CONFIG = {
   textBox: {
     minWidth: 160,
     maxWidth: 360,
-    horizontalPadding: 32,
+    horizontalPadding: 15,
     lineHeight: 20,
-    verticalPadding: 20,
+    verticalPadding: 15,
   },
   container: {
     minWidth: 120,
@@ -27,6 +27,7 @@ export const CONFIG = {
     containerNodeSpacing: 160,
     containerLayerSpacing: 240,
     edgeNudgingDistance: 16,
+    edgeCrossingPenalty: 100,
     rootPadding: "[top=40,left=40,bottom=40,right=40]",
   },
 } as const;

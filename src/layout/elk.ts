@@ -173,6 +173,22 @@ type Route = {
     bendPoints: Point[];
 };
 
+type RoutePath = {
+    edge: AstEdge;
+    route: Route;
+    points: Point[];
+};
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+type Segment = {
+    path: RoutePath;
+    index: number;
+    start: Point;
+    end: Point;
+    horizontal: boolean;
+};
+
 function visibleContainerAncestors(id: string, nodesById: Map<string, FlatLayoutNode>): Set<string> {
     const result = new Set<string>();
     let current = nodesById.get(id);
@@ -235,7 +251,7 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
             routingType: "orthogonal",
             shapeBufferDistance: 8,
             idealNudgingDistance: CONFIG.elk.edgeNudgingDistance,
-            crossingPenalty: 100,
+            crossingPenalty: CONFIG.elk.edgeCrossingPenalty,
             nudgeOrthogonalSegmentsConnectedToShapes: true,
             nudgeOrthogonalTouchingColinearSegments: true,
             nudgeSharedPathsWithCommonEndPoint: true,
@@ -246,6 +262,129 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
     return routes;
 }
 
+function routeObstacles(nodes: FlatLayoutNode[], edge: AstEdge): Rect[] {
+    const group = routingGroups(nodes, [edge])[0]!;
+    return (routingGraph(nodes, group).children ?? [])
+        .filter((node) => node.id !== edge.source && node.id !== edge.target)
+        .map((node) => ({ x: node.x ?? 0, y: node.y ?? 0, width: node.width ?? 0, height: node.height ?? 0 }));
+}
+
+function internalSegments(paths: RoutePath[]): Segment[] {
+    const segments: Segment[] = [];
+    for (const path of paths) {
+        for (let index = 1; index < path.points.length - 2; index += 1) {
+            const start = path.points[index]!;
+            const end = path.points[index + 1]!;
+            if (start.x === end.x || start.y === end.y) segments.push({ path, index, start, end, horizontal: start.y === end.y });
+        }
+    }
+    return segments;
+}
+
+function overlaps(first: Segment, second: Segment): boolean {
+    if (first.horizontal !== second.horizontal) return false;
+    if (first.horizontal && first.start.y !== second.start.y) return false;
+    if (!first.horizontal && first.start.x !== second.start.x) return false;
+    const [firstStart, firstEnd] = first.horizontal ? [first.start.x, first.end.x] : [first.start.y, first.end.y];
+    const [secondStart, secondEnd] = second.horizontal ? [second.start.x, second.end.x] : [second.start.y, second.end.y];
+    return Math.min(Math.max(firstStart, firstEnd), Math.max(secondStart, secondEnd)) > Math.max(Math.min(firstStart, firstEnd), Math.min(secondStart, secondEnd));
+}
+
+function crosses(first: Segment, second: Segment): boolean {
+    if (first.horizontal === second.horizontal) return false;
+    const horizontal = first.horizontal ? first : second;
+    const vertical = first.horizontal ? second : first;
+    const minX = Math.min(horizontal.start.x, horizontal.end.x);
+    const maxX = Math.max(horizontal.start.x, horizontal.end.x);
+    const minY = Math.min(vertical.start.y, vertical.end.y);
+    const maxY = Math.max(vertical.start.y, vertical.end.y);
+    return vertical.start.x > minX && vertical.start.x < maxX && horizontal.start.y > minY && horizontal.start.y < maxY;
+}
+
+function crossesObstacle(start: Point, end: Point, obstacle: Rect): boolean {
+    if (start.x === end.x) {
+        return start.x > obstacle.x && start.x < obstacle.x + obstacle.width
+            && Math.max(start.y, end.y) > obstacle.y && Math.min(start.y, end.y) < obstacle.y + obstacle.height;
+    }
+    return start.y > obstacle.y && start.y < obstacle.y + obstacle.height
+        && Math.max(start.x, end.x) > obstacle.x && Math.min(start.x, end.x) < obstacle.x + obstacle.width;
+}
+
+function pathAvoidsObstacles(points: Point[], obstacles: Rect[]): boolean {
+    for (let index = 1; index < points.length; index += 1) {
+        const start = points[index - 1]!;
+        const end = points[index]!;
+        if (start.x !== end.x && start.y !== end.y) return false;
+        if (obstacles.some((obstacle) => crossesObstacle(start, end, obstacle))) return false;
+    }
+    return true;
+}
+
+function nudgedPath(segment: Segment, offset: number): Point[] {
+    const { points } = segment.path;
+    const start = segment.start;
+    const end = segment.end;
+    const shiftedStart = segment.horizontal ? { x: start.x, y: start.y + offset } : { x: start.x + offset, y: start.y };
+    const shiftedEnd = segment.horizontal ? { x: end.x, y: end.y + offset } : { x: end.x + offset, y: end.y };
+    return [...points.slice(0, segment.index + 1), shiftedStart, shiftedEnd, ...points.slice(segment.index + 1)];
+}
+
+function conflictScore(paths: RoutePath[]): number {
+    const segments = internalSegments(paths);
+    let score = 0;
+    for (let first = 0; first < segments.length; first += 1) {
+        for (let second = first + 1; second < segments.length; second += 1) {
+            if (segments[first]!.path === segments[second]!.path) continue;
+            if (overlaps(segments[first]!, segments[second]!)) score += 2;
+            else if (crosses(segments[first]!, segments[second]!)) score += 1;
+        }
+    }
+    return score;
+}
+
+/**
+ * Separates routes produced in different Libavoid passes.  It only keeps a
+ * lane adjustment when the new orthogonal path clears that edge's obstacles
+ * and reduces the global overlap/crossing score.
+ */
+export function separateRouteLanes(nodes: FlatLayoutNode[], edges: AstEdge[], routes: Map<string, Route>): void {
+    const paths = edges.flatMap((edge): RoutePath[] => {
+        const route = routes.get(edge.id);
+        return route ? [{ edge, route, points: [route.sourcePoint, ...route.bendPoints, route.targetPoint] }] : [];
+    });
+    const obstacles = new Map(paths.map((path) => [path.edge.id, routeObstacles(nodes, path.edge)]));
+    const maxAdjustments = Math.max(paths.length * 4, 1);
+    for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
+        const baseline = conflictScore(paths);
+        if (!baseline) break;
+        let adjusted = false;
+        const segments = internalSegments(paths);
+        for (let first = 0; first < segments.length && !adjusted; first += 1) {
+            for (let second = first + 1; second < segments.length && !adjusted; second += 1) {
+                const a = segments[first]!;
+                const b = segments[second]!;
+                if (a.path === b.path || (!overlaps(a, b) && !crosses(a, b))) continue;
+                for (const segment of [b, a]) {
+                    for (const multiplier of [1, -1, 2, -2, 3, -3]) {
+                        const candidate = nudgedPath(segment, multiplier * CONFIG.elk.edgeNudgingDistance);
+                        if (!pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
+                        const original = segment.path.points;
+                        segment.path.points = candidate;
+                        if (conflictScore(paths) < baseline) {
+                            adjusted = true;
+                            break;
+                        }
+                        segment.path.points = original;
+                    }
+                    if (adjusted) break;
+                }
+            }
+        }
+        if (!adjusted) break;
+    }
+    for (const path of paths) path.route.bendPoints = simplifyWaypoints(path.points).slice(1, -1);
+}
+
 export async function layoutWithElk(ast: DocumentAst): Promise<LayoutResult> {
     const elk = new (ELK as unknown as ElkConstructor)();
     const nodesById = flattenAst(ast.nodes);
@@ -253,6 +392,7 @@ export async function layoutWithElk(ast: DocumentAst): Promise<LayoutResult> {
     await layoutChildren(elk, undefined, positioned, ast, nodesById);
     const nodes = flatten(positioned);
     const routes = await routeWithContainerObstacles(nodes, ast.edges);
+    separateRouteLanes(nodes, ast.edges, routes);
     const edges = byDeclarationOrder(ast.edges.map((edge): RoutedEdge => {
         const route = routes.get(edge.id);
         return route ? { ...edge, points: simplifyWaypoints(route.bendPoints), sourcePoint: route.sourcePoint, targetPoint: route.targetPoint } : { ...edge, points: [] };

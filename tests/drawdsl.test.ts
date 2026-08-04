@@ -4,7 +4,7 @@ import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
 import { resolveSymbol } from "../src/symbols/registry.js";
 import { renderDrawio } from "../src/render/drawio.js";
-import { layoutWithElk } from "../src/layout/elk.js";
+import { layoutWithElk, separateRouteLanes } from "../src/layout/elk.js";
 import { CONFIG } from "../src/config.js";
 
 test("requires namespaces and resolves aliases", () => {
@@ -205,6 +205,20 @@ source --> target`);
     for (let index = 1; index < points.length; index += 1) {
         assert.equal(crossesInterior(points[index - 1]!, points[index]!), false);
     }
+});
+
+test("post-routing lanes separate shared corridors from different routing passes", () => {
+    const edges = [
+        { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
+        { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
+    ];
+    const routes = new Map([
+        ["first", { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 50 }, { x: 200, y: 50 }], targetPoint: { x: 200, y: 100 } }],
+        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 50 }, { x: 180, y: 50 }], targetPoint: { x: 180, y: 100 } }],
+    ]);
+    separateRouteLanes([], edges, routes);
+    const second = routes.get("second")!;
+    assert.ok(second.bendPoints.some((point) => point.y !== 50));
 });
 
 test("container-scoped ELK direction controls local layered layout", async () => {
