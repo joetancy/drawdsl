@@ -1,11 +1,12 @@
 import { isRenderable, type AstEdge, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type NodeSide, type SymbolRef } from "./model.js";
+import { layoutNumber, normalizeLayoutConfig, type ContainerLayoutOptions, type ParsedLayoutConfig } from "./config.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
 const EDGE_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const DEFAULT_LAYOUT_RE = /^layout\s+elk$/;
 const GRID_COLUMNS_RE = /^grid-columns\s+([1-9]\d*)$/;
-const NODE_SPACING_RE = /^node-spacing\s+([1-9]\d*)$/;
+const LAYOUT_SETTING_RE = /^(node-spacing|layer-spacing|edge-spacing|padding)(?:\s+(.*))?$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
@@ -65,7 +66,8 @@ export function parseDsl(source: string): DocumentAst {
     const edges: AstEdge[] = [];
     const stack: AstNode[] = [];
     const ids = new Set<string>();
-    let direction: Direction = "right";
+    const parsedLayout: ParsedLayoutConfig = {};
+    const documentSettings = new Set<string>();
     let order = 0;
     let anonymousNodeCount = 0;
 
@@ -92,10 +94,11 @@ export function parseDsl(source: string): DocumentAst {
         const directionMatch = line.match(DIRECTION_RE);
         if (directionMatch) {
             const container = stack.at(-1);
-            if (!container) direction = directionMatch[1] as Direction;
+            if (!container) parsedLayout.direction = directionMatch[1] as Direction;
             else {
-                if (container.direction !== undefined) throw new Error(`Line ${lineNumber}: direction is already set for container ${container.id}`);
-                container.direction = directionMatch[1] as Direction;
+                container.layout ??= {};
+                if (container.layout.direction !== undefined) throw new Error(`Line ${lineNumber}: direction is already set for container ${container.id}`);
+                container.layout.direction = directionMatch[1] as Direction;
             }
             continue;
         }
@@ -103,16 +106,27 @@ export function parseDsl(source: string): DocumentAst {
         if (gridColumnsMatch) {
             const container = stack.at(-1);
             if (!container) throw new Error(`Line ${lineNumber}: grid-columns must be inside a container`);
-            if (container.gridColumns !== undefined) throw new Error(`Line ${lineNumber}: grid-columns is already set for container ${container.id}`);
-            container.gridColumns = Number(gridColumnsMatch[1]);
+            container.layout ??= {};
+            if (container.layout.gridColumns !== undefined) throw new Error(`Line ${lineNumber}: grid-columns is already set for container ${container.id}`);
+            container.layout.gridColumns = Number(gridColumnsMatch[1]);
             continue;
         }
-        const nodeSpacingMatch = line.match(NODE_SPACING_RE);
-        if (nodeSpacingMatch) {
+        const layoutSettingMatch = line.match(LAYOUT_SETTING_RE);
+        if (layoutSettingMatch) {
+            const name = layoutSettingMatch[1]!;
             const container = stack.at(-1);
-            if (!container) throw new Error(`Line ${lineNumber}: node-spacing must be inside a container`);
-            if (container.nodeSpacing !== undefined) throw new Error(`Line ${lineNumber}: node-spacing is already set for container ${container.id}`);
-            container.nodeSpacing = Number(nodeSpacingMatch[1]);
+            if (name === "edge-spacing" && container) throw new Error(`Line ${lineNumber}: edge-spacing must be top-level`);
+            const key = name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()) as keyof ParsedLayoutConfig;
+            const value = layoutNumber(name, layoutSettingMatch[2], lineNumber, name === "padding");
+            if (container) {
+                container.layout ??= {};
+                if (container.layout[key as keyof ContainerLayoutOptions] !== undefined) throw new Error(`Line ${lineNumber}: ${name} is already set for container ${container.id}`);
+                Object.assign(container.layout, { [key]: value });
+            } else {
+                if (documentSettings.has(name)) throw new Error(`Line ${lineNumber}: ${name} is already set at document level`);
+                documentSettings.add(name);
+                Object.assign(parsedLayout, { [key]: value });
+            }
             continue;
         }
         const edgeMatch = line.match(EDGE_RE);
@@ -176,6 +190,7 @@ export function parseDsl(source: string): DocumentAst {
     while (pendingNodes.length) {
         const node = pendingNodes.pop()!;
         nodesById.set(node.id, node);
+        if (node.layout?.gridColumns !== undefined && !node.children.length) throw new Error(`grid-columns requires at least one child (container ${node.id})`);
         pendingNodes.push(...node.children);
     }
     for (const edge of edges) {
@@ -188,15 +203,5 @@ export function parseDsl(source: string): DocumentAst {
         if (source && !isRenderable(source)) throw new Error(`Invisible node cannot be an edge endpoint: ${edge.source}`);
         if (target && !isRenderable(target)) throw new Error(`Invisible node cannot be an edge endpoint: ${edge.target}`);
     }
-    const containers = [...rootNodes];
-    while (containers.length) {
-        const container = containers.pop()!;
-        if (container.gridColumns === undefined) {
-            containers.push(...container.children);
-            continue;
-        }
-        if (!container.children.length) throw new Error(`grid-columns requires at least one child (container ${container.id})`);
-        containers.push(...container.children);
-    }
-    return { direction, nodes: rootNodes, edges };
+    return { layout: normalizeLayoutConfig(parsedLayout), nodes: rootNodes, edges };
 }

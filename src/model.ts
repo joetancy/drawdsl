@@ -1,3 +1,5 @@
+import type { ContainerLayoutOptions, LayoutConfig } from "./config.js";
+
 export type Direction = "right" | "left" | "down" | "up";
 export type NodeSide = "top" | "right" | "bottom" | "left";
 export type EdgeOperator = "-->" | "-.->" | "---" | "-.-" | "<-->" | "<-.->";
@@ -41,9 +43,7 @@ export type AstNode = {
     label: string;
     parentId?: string;
     children: AstNode[];
-    gridColumns?: number;
-    nodeSpacing?: number;
-    direction?: Direction;
+    layout?: ContainerLayoutOptions;
     declarationOrder: number;
 };
 
@@ -59,7 +59,7 @@ export type AstEdge = {
 };
 
 export type DocumentAst = {
-    direction: Direction;
+    layout: LayoutConfig;
     nodes: AstNode[];
     edges: AstEdge[];
 };

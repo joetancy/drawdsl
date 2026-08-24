@@ -1,18 +1,18 @@
-import { CONFIG } from "../config.js";
-import type { AstNode, DocumentAst, FlatLayoutNode, Point } from "../model.js";
+import { DRAWING_DEFAULTS } from "../config.js";
+import type { AstNode, Direction, FlatLayoutNode, Point } from "../model.js";
 
 export function dimensions(node: AstNode): { width: number; height: number } {
     if (node.definition.layoutOnly) return { width: 1, height: 1 };
-    if (node.definition.role === "container") return { width: CONFIG.container.minWidth, height: CONFIG.container.minHeight };
+    if (node.definition.role === "container") return { width: DRAWING_DEFAULTS.container.minWidth, height: DRAWING_DEFAULTS.container.minHeight };
     if (node.definition.role === "annotation") {
         const lines = node.label.split("\n");
         const longest = Math.max(...lines.map((line) => line.length), 1);
         return {
-            width: Math.min(CONFIG.textBox.maxWidth, Math.max(CONFIG.textBox.minWidth, longest * 7 + CONFIG.textBox.horizontalPadding)),
-            height: lines.length * CONFIG.textBox.lineHeight + CONFIG.textBox.verticalPadding,
+            width: Math.min(DRAWING_DEFAULTS.textBox.maxWidth, Math.max(DRAWING_DEFAULTS.textBox.minWidth, longest * 7 + DRAWING_DEFAULTS.textBox.horizontalPadding)),
+            height: lines.length * DRAWING_DEFAULTS.textBox.lineHeight + DRAWING_DEFAULTS.textBox.verticalPadding,
         };
     }
-    return { width: CONFIG.iconSize * (node.definition.widthScale ?? 1), height: CONFIG.iconSize * (node.definition.heightScale ?? 1) };
+    return { width: DRAWING_DEFAULTS.iconSize * (node.definition.widthScale ?? 1), height: DRAWING_DEFAULTS.iconSize * (node.definition.heightScale ?? 1) };
 }
 
 export function flattenAst(nodes: AstNode[]): Map<string, AstNode> {
@@ -55,4 +55,4 @@ export function sharedContainerOrigin(source: string, target: string, layoutNode
     return { x: 0, y: 0 };
 }
 
-export function elkDirection(direction: DocumentAst["direction"]): string { return { right: "RIGHT", left: "LEFT", down: "DOWN", up: "UP" }[direction]; }
+export function elkDirection(direction: Direction): string { return { right: "RIGHT", left: "LEFT", down: "DOWN", up: "UP" }[direction]; }

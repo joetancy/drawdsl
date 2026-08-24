@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
 import { resolveSymbol } from "../src/symbols/registry.js";
 import { renderDrawio } from "../src/render/drawio.js";
-import { enforceGlobalEdgeSpacing, layoutWithElk } from "../src/layout/elk.js";
-import { CONFIG } from "../src/config.js";
+import { layoutDocument } from "../src/layout/index.js";
+import { enforceGlobalEdgeSpacing } from "../src/layout/routing.js";
+import { DEFAULT_LAYOUT_CONFIG } from "../src/config.js";
 
 test("requires namespaces and resolves aliases", () => {
     const ast = parseDsl('aws:apigw gateway "Gateway"\ncore:text note "Hello"\n gateway --> note');
@@ -44,15 +46,15 @@ R:sender --> B:queue`);
     assert.equal(edge.sourceSide, "right");
     assert.equal(edge.targetSide, "bottom");
 
-    const layout = await layoutWithElk(ast);
+    const layout = await layoutDocument(ast);
     const queue = layout.nodes.find((node) => node.id === "queue")!;
     const routed = layout.edges[0]!;
     assert.ok(Math.abs(routed.targetPoint!.x - (queue.x + queue.width / 2)) < 0.001);
     assert.ok(Math.abs(routed.targetPoint!.y - (queue.y + queue.height)) < 0.001);
     const points = [routed.sourcePoint!, ...routed.points, routed.targetPoint!];
     const distance = (first: { x: number; y: number }, second: { x: number; y: number }): number => Math.abs(first.x - second.x) + Math.abs(first.y - second.y);
-    assert.ok(distance(points[0]!, points[1]!) >= CONFIG.elk.edgeEndpointClearance);
-    assert.ok(distance(points.at(-2)!, points.at(-1)!) >= CONFIG.elk.edgeEndpointClearance);
+    assert.ok(distance(points[0]!, points[1]!) >= DEFAULT_LAYOUT_CONFIG.edgeEndpointClearance);
+    assert.ok(distance(points.at(-2)!, points.at(-1)!) >= DEFAULT_LAYOUT_CONFIG.edgeEndpointClearance);
 
     const xml = renderDrawio(layout.nodes, layout.edges);
     assert.match(xml, /exitX=1\.0000;exitY=0\.5000/);
@@ -113,7 +115,7 @@ core:spacer`);
     assert.match(spacers[0]?.id ?? "", /^__core_spacer_\d+$/);
     assert.throws(() => parseDsl("core:spacer\naws:lambda fn\n__core_spacer_1 --> fn"), /Invisible node cannot be an edge endpoint/);
 
-    const layout = await layoutWithElk(ast);
+    const layout = await layoutDocument(ast);
     const spacer = layout.nodes.find((node) => node.id === spacers[0]?.id)!;
     assert.equal(spacer.width, 80);
     const xml = renderDrawio(layout.nodes, layout.edges);
@@ -144,13 +146,13 @@ test("layout-only grids accept connected children and stay invisible in draw.io"
 }
 worker_a --> worker_d`);
     const columns = ast.nodes[0]?.children[0];
-    assert.equal(columns?.gridColumns, 2);
+    assert.equal(columns?.layout?.gridColumns, 2);
     assert.equal(columns?.definition.layoutOnly, true);
     assert.throws(() => parseDsl("grid-columns 3"), /must be inside a container/);
     assert.throws(() => parseDsl("core:group workers {\n    grid-columns 2\n}"), /requires at least one child/);
     assert.throws(() => parseDsl("core:layout structure {\n    aws:lambda worker\n}\nstructure --> worker"), /Layout-only container cannot be an edge endpoint/);
 
-    const layout = await layoutWithElk(ast);
+    const layout = await layoutDocument(ast);
     const workers = layout.nodes.filter((node) => node.parentId === "columns");
     assert.equal(new Set(workers.map((node) => node.x)).size, 2);
     assert.equal(new Set(workers.map((node) => node.y)).size, 2);
@@ -196,15 +198,15 @@ test("grid columns preserve declaration order and center mixed-size groups", asy
         aws:lambda right_b
     }
 }`);
-    const layout = await layoutWithElk(ast);
+    const layout = await layoutDocument(ast);
     const left = layout.nodes.find((node) => node.id === "left")!;
     const centre = layout.nodes.find((node) => node.id === "centre")!;
     const right = layout.nodes.find((node) => node.id === "right")!;
     assert.ok(left.x < centre.x && centre.x < right.x);
     assert.equal(left.y + left.height / 2, centre.y + centre.height / 2);
     assert.equal(centre.y + centre.height / 2, right.y + right.height / 2);
-    assert.equal(centre.x - (left.x + left.width), CONFIG.elk.containerNodeSpacing);
-    assert.equal(right.x - (centre.x + centre.width), CONFIG.elk.containerNodeSpacing);
+    assert.equal(centre.x - (left.x + left.width), DEFAULT_LAYOUT_CONFIG.nodeSpacing.container);
+    assert.equal(right.x - (centre.x + centre.width), DEFAULT_LAYOUT_CONFIG.nodeSpacing.container);
 });
 
 test("Libavoid routes around unrelated visible containers", async () => {
@@ -221,7 +223,7 @@ test("Libavoid routes around unrelated visible containers", async () => {
     }
 }
 source --> target`);
-    const layout = await layoutWithElk(ast);
+    const layout = await layoutDocument(ast);
     const blocker = layout.nodes.find((node) => node.id === "blocker")!;
     const edge = layout.edges[0]!;
     const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
@@ -248,14 +250,14 @@ test("global edge spacing separates close route segments from different routing 
         ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 62 }, { x: 180, y: 62 }], targetPoint: { x: 180, y: 100 } }],
     ]);
 
-    enforceGlobalEdgeSpacing([], edges, routes);
+    enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
 
     const horizontalSegmentY = (route: { sourcePoint: { x: number; y: number }; bendPoints: { x: number; y: number }[]; targetPoint: { x: number; y: number } }): number => {
         const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
         const segment = points.find((point, index) => index > 0 && Math.abs(point.x - points[index - 1]!.x) >= 100 && point.y === points[index - 1]!.y);
         return segment!.y;
     };
-    assert.ok(Math.abs(horizontalSegmentY(routes.get("first")!) - horizontalSegmentY(routes.get("second")!)) >= CONFIG.elk.edgeSpacing);
+    assert.ok(Math.abs(horizontalSegmentY(routes.get("first")!) - horizontalSegmentY(routes.get("second")!)) >= DEFAULT_LAYOUT_CONFIG.edgeSpacing);
 });
 
 test("container-scoped ELK direction controls local layered layout", async () => {
@@ -266,8 +268,8 @@ core:group workers {
     aws:lambda second
     first --> second
 }`);
-    assert.equal(ast.nodes[0]?.direction, "down");
-    const layout = await layoutWithElk(ast);
+    assert.equal(ast.nodes[0]?.layout?.direction, "down");
+    const layout = await layoutDocument(ast);
     const first = layout.nodes.find((node) => node.id === "first")!;
     const second = layout.nodes.find((node) => node.id === "second")!;
     assert.equal(first.x, second.x);
@@ -275,5 +277,99 @@ core:group workers {
 
     assert.throws(() => parseDsl("core:group workers {\n    direction down\n    direction right\n}"), /direction is already set/);
     assert.throws(() => parseDsl("core:group workers {\n    layer-bound 2\n}"), /unsupported syntax/);
-    assert.throws(() => parseDsl("node-spacing 140"), /must be inside a container/);
+    assert.equal(parseDsl("node-spacing 140\naws:lambda fn").layout.nodeSpacing.root, 140);
+});
+
+test("omitted and partial layout configuration normalize without running layout", () => {
+    const defaults = parseDsl("aws:lambda fn");
+    assert.deepEqual(defaults.layout, DEFAULT_LAYOUT_CONFIG);
+
+    const partial = parseDsl(`node-spacing 50
+edge-spacing 30
+aws:lambda fn`);
+    assert.deepEqual(partial.layout.nodeSpacing, { root: 50, resource: 50, container: 50 });
+    assert.equal(partial.layout.edgeSpacing, 30);
+    assert.equal(partial.layout.layerSpacing, DEFAULT_LAYOUT_CONFIG.layerSpacing);
+    assert.deepEqual(partial.layout.padding, DEFAULT_LAYOUT_CONFIG.padding);
+});
+
+test("document node spacing is inherited and a container override wins locally", async () => {
+    const ast = parseDsl(`node-spacing 50
+core:layout outer {
+    grid-columns 2
+    aws:lambda first
+    aws:lambda second
+}
+core:layout local {
+    grid-columns 2
+    node-spacing 15
+    aws:lambda third
+    aws:lambda fourth
+}`);
+    const layout = await layoutDocument(ast);
+    const node = (id: string) => layout.nodes.find((item) => item.id === id)!;
+    assert.equal(node("second").x - node("first").x - node("first").width, 50);
+    assert.equal(node("fourth").x - node("third").x - node("third").width, 15);
+});
+
+test("document layer spacing changes deterministic layered geometry", async () => {
+    const layout = await layoutDocument(parseDsl(`layer-spacing 123
+aws:lambda source
+aws:sqs target
+source --> target`));
+    const source = layout.nodes.find((node) => node.id === "source")!;
+    const target = layout.nodes.find((node) => node.id === "target")!;
+    assert.equal(target.x - source.x - source.width, 123);
+});
+
+test("padding applies at the root and can be overridden by a container", async () => {
+    const layout = await layoutDocument(parseDsl(`padding 17
+core:group inherited {
+    aws:lambda first
+}
+core:group overridden {
+    padding 5
+    aws:lambda second
+}`));
+    const node = (id: string) => layout.nodes.find((item) => item.id === id)!;
+    assert.equal(node("inherited").x, 17);
+    assert.equal(node("first").x - node("inherited").x, 17);
+    assert.equal(node("second").x - node("overridden").x, 5);
+});
+
+test("layout settings reject invalid values, duplicates, and invalid scope", () => {
+    assert.throws(() => parseDsl("node-spacing 0\naws:lambda fn"), /Line 1: node-spacing must be an integer from 1 to 10000/);
+    assert.throws(() => parseDsl("layer-spacing 1.5\naws:lambda fn"), /Line 1: layer-spacing/);
+    assert.throws(() => parseDsl("padding -1\naws:lambda fn"), /Line 1: padding must be an integer from 0 to 10000/);
+    assert.throws(() => parseDsl("edge-spacing 10001\naws:lambda fn"), /Line 1: edge-spacing/);
+    assert.throws(() => parseDsl("node-spacing 10\nnode-spacing 20\naws:lambda fn"), /Line 2: node-spacing is already set at document level/);
+    assert.throws(() => parseDsl("core:group g {\nedge-spacing 20\n}"), /Line 2: edge-spacing must be top-level/);
+});
+
+test("explicit edge spacing drives the global route lane pass", () => {
+    const config = parseDsl("edge-spacing 40\naws:lambda fn").layout;
+    const edges = [
+        { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
+        { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
+    ];
+    const routes = new Map([
+        ["first", { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 50 }, { x: 200, y: 50 }], targetPoint: { x: 200, y: 100 } }],
+        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 62 }, { x: 180, y: 62 }], targetPoint: { x: 180, y: 100 } }],
+    ]);
+    enforceGlobalEdgeSpacing([], edges, routes, config);
+    const firstY = routes.get("first")!.bendPoints[0]!.y;
+    const secondY = routes.get("second")!.bendPoints[0]!.y;
+    assert.ok(Math.abs(firstY - secondY) >= 40);
+});
+
+test("the bundled legacy DrawDSL file still parses, lays out, and renders", async () => {
+    const source = await readFile(new URL("../examples/elk.drawdsl", import.meta.url), "utf8");
+    const ast = parseDsl(source);
+    const layout = await layoutDocument(ast);
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    assert.equal(layout.nodes.length > 10, true);
+    assert.equal(layout.edges.length > 10, true);
+    assert.match(xml, /<mxfile/);
+    assert.match(xml, /id="cloud"/);
+    assert.match(xml, /id="edge_1_internet_cdn"/);
 });

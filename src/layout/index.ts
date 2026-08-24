@@ -1,6 +1,8 @@
 import type { DocumentAst, LayoutResult } from "../model.js";
-import { layoutWithElk } from "./elk.js";
+import { positionWithElk } from "./elk.js";
+import { routeDiagram } from "./routing.js";
 
-export function layoutDocument(ast: DocumentAst): Promise<LayoutResult> {
-    return layoutWithElk(ast);
+export async function layoutDocument(ast: DocumentAst): Promise<LayoutResult> {
+    const nodes = await positionWithElk(ast, ast.layout);
+    return { nodes, edges: await routeDiagram(nodes, ast.edges, ast.layout) };
 }

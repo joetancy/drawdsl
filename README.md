@@ -128,14 +128,25 @@ worker --> records
 
 `grid-columns` applies to a container’s direct children. Child subtrees are first sized, then placed into an exact declaration-ordered grid. Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
 
-Use `node-spacing` inside a container to override its direct-child gap without changing the global defaults:
+Layout settings use the same flat, hyphenated syntax as the existing directives. Document-level values apply throughout the diagram; a setting inside a container overrides that container's direct-child layout:
 
 ```text
+direction right
+node-spacing 120
+layer-spacing 180
+edge-spacing 24
+padding 40
+
 core:layout application_grid {
     grid-columns 5
-    node-spacing 140
+    node-spacing 60
+    padding 20
 }
 ```
+
+`direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `edge-spacing` is document-only. Partial configuration is supported.
+
+When omitted, root nodes use 240px spacing, resources inside containers use 80px, container-only siblings use 160px, layers use 240px, and routed edge lanes use 20px. Root padding is 40px; visible containers use 40px vertically and 80px horizontally; invisible `core:layout` containers have no padding. Explicit document-level `node-spacing` or `padding` replaces these tiered defaults.
 
 Containers can also override the document flow direction for their non-grid children:
 
@@ -151,7 +162,7 @@ Container directions support `right`, `left`, `down`, and `up`. A strict `grid-c
 
 ELK positions the hierarchy and the orthogonal router uses the completed geometry. Visible containers unrelated to either endpoint remain routing obstacles, while source and destination ancestor containers stay traversable so connections can enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points.
 
-Set `CONFIG.elk.edgeSpacing` in `src/config.ts` to the global gap between overlapping parallel route segments (24px by default). Edges are routed with their own container obstacles, then a final obstacle-aware lane pass applies the same spacing across routes from different container-routing passes. Set `CONFIG.elk.edgeEndpointClearance` independently to control the minimum straight run leaving or entering a node before an orthogonal bend (also 24px by default). Shared-path nudging is enabled so edges are kept distinct. Perpendicular crossings are allowed and do not affect routing. When the available geometry cannot fit a lane, the router preserves an obstacle-free route instead of forcing an invalid one.
+`edge-spacing` controls the global gap between overlapping parallel route segments. Edges are routed with their own container obstacles, then a final obstacle-aware lane pass applies the same spacing across routes from different container-routing passes. The endpoint clearance remains an internal 40px routing default. Shared-path nudging is enabled so edges are kept distinct. Perpendicular crossings are allowed and do not affect routing. When the available geometry cannot fit a lane, the router preserves an obstacle-free route instead of forcing an invalid one.
 
 Explicit `T:`, `R:`, `B:`, and `L:` endpoint selectors remain available when a relationship needs a specific source or target side.
 
