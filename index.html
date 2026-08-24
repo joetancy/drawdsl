@@ -13,7 +13,6 @@
         <span>Architecture diagrams from text</span>
         <div class="header-actions">
             <button id="guide-toggle" type="button">DSL guide</button>
-            <button id="copy-xml" type="button" disabled>Copy draw.io XML</button>
             <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
         </div>
     </header>
@@ -21,9 +20,16 @@
         <section class="editor-pane">
             <div class="editor-toolbar">
                 <label for="source">DSL</label>
-                <button id="xml-toggle" type="button" disabled>Show draw.io XML</button>
+                <div class="editor-actions">
+                    <button id="format-dsl" type="button">Format DrawDSL</button>
+                    <button id="xml-toggle" type="button" disabled>Show draw.io XML</button>
+                    <button id="copy-xml" type="button" disabled>Copy draw.io XML</button>
+                </div>
             </div>
-            <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+            <div class="editor-input">
+                <pre id="line-numbers" aria-hidden="true">1</pre>
+                <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+            </div>
             <output id="status" aria-live="polite"></output>
         </section>
         <section class="preview-pane" aria-label="Diagram preview">

@@ -93,6 +93,7 @@ main {
 label { font-size: 13px; font-weight: 700; }
 
 .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-actions { display: flex; gap: 8px; }
 .editor-toolbar button { height: 32px; padding: 0 12px; border: 1px solid #c5ccda; border-radius: 6px; color: #34405a; background: white; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; }
 .editor-toolbar button:hover:not(:disabled) { background: #f1f4f9; }
 .editor-toolbar button:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -110,6 +111,10 @@ textarea {
     font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     tab-size: 4;
 }
+
+.editor-input { display: grid; grid-template-columns: 42px 1fr; min-height: 0; }
+#line-numbers { margin: 0; padding: 14px 10px 14px 0; overflow: hidden; border: 1px solid #c5ccda; border-right: 0; border-radius: 6px 0 0 6px; color: #8994a8; background: #f1f4f9; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: right; user-select: none; }
+.editor-input textarea { border-radius: 0 6px 6px 0; }
 
 textarea:focus { border-color: #527fff; box-shadow: 0 0 0 3px #527fff22; }
 
@@ -163,6 +168,8 @@ output {
     color: #edf2ff;
     background: #101522;
 }
+
+:root[data-theme="dark"] #line-numbers { border-color: #3b4862; color: #71809d; background: #151d2d; }
 
 :root[data-theme="dark"] #preview {
     border-color: #303b52;
