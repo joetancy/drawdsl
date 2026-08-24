@@ -193,3 +193,20 @@ npm test
 ```
 
 The test suite covers parsing, namespace resolution, formatting, provider styles, and draw.io rendering.
+
+## Web playground
+
+Run the browser playground locally:
+
+```bash
+npm run web:dev
+```
+
+Production builds are written to `dist/`:
+
+```bash
+npm run web:build
+npm run web:preview
+```
+
+The repository deploys the playground to `https://joetancy.github.io/drawdsl/` on pushes to `main`. In GitHub, select **Settings → Pages → Build and deployment → Source → GitHub Actions** once to enable it.

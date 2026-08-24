@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Write DrawDSL and preview the resulting architecture diagram.">
+    <title>DrawDSL Playground</title>
+    <script type="module" src="/src/web.ts"></script>
+</head>
+<body>
+    <header>
+        <h1>DrawDSL</h1>
+        <span>Architecture diagrams from text</span>
+        <div class="header-actions">
+            <button id="guide-toggle" type="button">DSL guide</button>
+            <button id="copy-xml" type="button" disabled>Copy draw.io XML</button>
+            <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
+        </div>
+    </header>
+    <main>
+        <section class="editor-pane">
+            <div class="editor-toolbar">
+                <label for="source">DSL</label>
+                <button id="xml-toggle" type="button" disabled>Show draw.io XML</button>
+            </div>
+            <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+            <output id="status" aria-live="polite"></output>
+        </section>
+        <section class="preview-pane" aria-label="Diagram preview">
+            <div id="preview"><span>Rendering…</span></div>
+        </section>
+    </main>
+    <dialog id="guide" aria-labelledby="guide-title">
+        <div class="guide-content">
+            <div class="guide-heading">
+                <h2 id="guide-title">DrawDSL guide</h2>
+                <button id="guide-close" class="guide-close" type="button" aria-label="Close guide">×</button>
+            </div>
+            <p>Declare namespaced resources, place related resources in containers, then connect their IDs.</p>
+            <pre><code>direction right
+
+aws:lambda handler "Request handler"
+aws:dynamodb data "Application data"
+handler --> data : stores results</code></pre>
+            <h3>Arrows</h3>
+            <pre><code>source --> target       directed, solid
+source -.-> target      directed, dashed
+source --- target       undirected, solid
+source -.- target       undirected, dashed
+source &lt;--&gt; target      bidirectional, solid
+source &lt;-.-&gt; target     bidirectional, dashed</code></pre>
+            <p>Pin an endpoint with <code>T:</code>, <code>R:</code>, <code>B:</code>, or <code>L:</code>: <code>R:handler --&gt; T:data</code>.</p>
+            <h3>Declarations and containers</h3>
+            <pre><code>namespace:symbol id "Optional label"
+aws:cloud cloud "AWS Cloud" {
+    aws:region region "ap-southeast-1" {
+        aws:lambda worker
+    }
+}</code></pre>
+            <p>Use <code>#</code> for comments. Labels support <code>\n</code>, <code>\"</code>, and <code>\\</code> escapes. Layout directives include <code>direction</code>, <code>node-spacing</code>, <code>layer-spacing</code>, <code>edge-spacing</code>, <code>padding</code>, and container-only <code>grid-columns</code>.</p>
+            <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram.</p>
+        </div>
+    </dialog>
+</body>
+</html>

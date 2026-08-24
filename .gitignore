@@ -2,7 +2,13 @@
 node_modules/
 dist/
 
+# Keep checked-in examples; ignore local diagrams elsewhere
+*.drawdsl
+*.drawio
+!examples/
+!examples/**/*.drawdsl
+!examples/**/*.drawio
+
 # Local tooling noise
 *.log
 .DS_Store
-
