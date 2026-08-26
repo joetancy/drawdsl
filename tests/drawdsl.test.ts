@@ -91,6 +91,16 @@ test("provider styles retain fully qualified draw.io shapes", () => {
     assert.equal(alb.definition.drawio.fill, "#8C4FFF");
 });
 
+test("AWS general icons render without resource tiles", () => {
+    for (const name of ["client", "corporate_data_center", "general", "mobile_client", "traditional_server", "user", "users"]) {
+        const { definition } = resolveSymbol({ namespace: "aws", name });
+        assert.equal(definition.drawio.shape, `mxgraph.aws4.${name}`);
+        assert.equal(definition.drawio.resIcon, undefined);
+        assert.equal(definition.drawio.fill, "#232F3D");
+        assert.equal(definition.drawio.stroke, "none");
+    }
+});
+
 test("core images render as image cells without a visible label", () => {
     const ast = parseDsl('core:image reference "https://example.com/reference.png"');
     const image = ast.nodes[0]!;

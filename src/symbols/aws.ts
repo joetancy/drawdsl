@@ -859,7 +859,18 @@ const catalogIcons2025 = [
     "xray",
 ] as const;
 
-const catalogSymbols: Record<string, SymbolDefinition> = Object.fromEntries([...catalogIcons, ...catalogIcons2025].map((icon) => [icon, resource(icon)]));
+const standaloneIcons = new Set([
+  "client",
+  "corporate_data_center",
+  "internet",
+  "mobile_client",
+  "traditional_server",
+  "user",
+  "users",
+]);
+const catalogSymbols: Record<string, SymbolDefinition> = Object.fromEntries(
+  [...catalogIcons, ...catalogIcons2025].map((icon) => [icon, standaloneIcons.has(icon) ? shape(icon, "#232F3D") : resource(icon)]),
+);
 
 const symbols: Record<string, SymbolDefinition> = {
     ...catalogSymbols,
@@ -908,7 +919,7 @@ const symbols: Record<string, SymbolDefinition> = {
   eni: shape("elastic_network_interface", "#8C4FFF"),
   endpoint: shape("endpoint", "#4D27AA"),
   eventbridge: resource("eventbridge", "#E7157B"),
-  general: resource("general", "#1E262E"),
+  general: shape("general", "#232F3D"),
   generic_firewall: shape("generic_firewall", "#232F3E"),
   guardduty: resource("guardduty", "#DD344C"),
   iam: resource("identity_and_access_management"),
