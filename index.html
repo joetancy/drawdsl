@@ -22,6 +22,7 @@
                 <label for="source">DSL</label>
                 <div class="editor-actions">
                     <button id="format-dsl" type="button">Format DrawDSL</button>
+                    <button id="copy-share-link" type="button">Copy share link</button>
                     <button id="xml-toggle" type="button" disabled>Show draw.io XML</button>
                     <button id="copy-xml" type="button" disabled>Copy draw.io XML</button>
                 </div>
@@ -68,6 +69,7 @@ aws:cloud cloud "AWS Cloud" {
 }</code></pre>
             <p>Use <code>#</code> for comments. Labels support <code>\n</code>, <code>\"</code>, and <code>\\</code> escapes. Layout directives include <code>direction</code>, <code>node-spacing</code>, <code>layer-spacing</code>, <code>edge-spacing</code>, <code>padding</code>, and container-only <code>grid-columns</code>.</p>
             <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram.</p>
+            <p>Use <strong>Copy share link</strong> to copy a self-contained URL for this DSL. Links are compressed when possible and work without a backend; anyone with the link can read the DSL, so do not include secrets.</p>
         </div>
     </dialog>
 </body>

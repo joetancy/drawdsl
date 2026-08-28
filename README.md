@@ -210,3 +210,5 @@ npm run web:preview
 ```
 
 The repository deploys the playground to `https://joetancy.github.io/drawdsl/` on pushes to `main`. In GitHub, select **Settings → Pages → Build and deployment → Source → GitHub Actions** once to enable it.
+
+Use **Copy share link** to copy a self-contained link to the current DSL. The playground stores the diagram in the URL fragment, compressing it when that produces a shorter link; no diagram data is sent to or stored by a backend. The URL updates three seconds after you stop typing, while the copy button always creates the current link immediately. Anyone with the link can read its contents, so do not include secrets.

@@ -36,6 +36,7 @@ const guide = document.querySelector<HTMLDialogElement>("#guide")!;
 const guideToggle = document.querySelector<HTMLButtonElement>("#guide-toggle")!;
 const guideClose = document.querySelector<HTMLButtonElement>("#guide-close")!;
 const formatDslButton = document.querySelector<HTMLButtonElement>("#format-dsl")!;
+const copyShareLink = document.querySelector<HTMLButtonElement>("#copy-share-link")!;
 const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
 const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
@@ -53,6 +54,52 @@ let darkMode = false;
 let latestXml = "";
 let dslSource = "";
 let showingXml = false;
+let shareRevision = 0;
+let shareDebounce: ReturnType<typeof setTimeout>;
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(value: string): ArrayBuffer {
+    const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes.buffer;
+}
+
+async function compressDsl(value: string): Promise<string> {
+    const compressed = new Blob([new TextEncoder().encode(value)]).stream().pipeThrough(new CompressionStream("gzip"));
+    return bytesToBase64Url(new Uint8Array(await new Response(compressed).arrayBuffer()));
+}
+
+async function decompressDsl(value: string): Promise<string> {
+    const decompressed = new Blob([base64UrlToBytes(value)]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new TextDecoder().decode(await new Response(decompressed).arrayBuffer());
+}
+
+async function syncShareUrl(expectedRevision?: number): Promise<void> {
+    const rawHash = `dsl=${encodeURIComponent(dslSource)}`;
+    let hash = rawHash;
+    try {
+        const compressedHash = `v=1&z=${await compressDsl(dslSource)}`;
+        if (compressedHash.length < rawHash.length) hash = compressedHash;
+    } catch {
+        // Compression Streams are unavailable; raw links remain shareable.
+    }
+    if (expectedRevision !== undefined && expectedRevision !== shareRevision) return;
+    history.replaceState(null, "", `#${hash}`);
+}
+
+function scheduleShareUrl(): void {
+    const revision = ++shareRevision;
+    clearTimeout(shareDebounce);
+    shareDebounce = setTimeout(() => { void syncShareUrl(revision); }, 3000);
+}
 
 function escapeHtml(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -156,8 +203,9 @@ async function render(): Promise<void> {
     }
 }
 
-source.value = starter;
-dslSource = starter;
+const shareParams = new URLSearchParams(location.hash.slice(1));
+source.value = shareParams.get("dsl") ?? starter;
+dslSource = source.value;
 updateEditor();
 guideToggle.addEventListener("click", () => guide.showModal());
 guideClose.addEventListener("click", () => guide.close());
@@ -171,6 +219,7 @@ formatDslButton.addEventListener("click", () => {
         showingXml = false;
         dslSource = formatted;
         source.value = formatted;
+        scheduleShareUrl();
         updateEditor();
         source.readOnly = false;
         xmlToggle.textContent = "Show draw.io XML";
@@ -216,6 +265,16 @@ copyXml.addEventListener("click", async () => {
         status.textContent = "Clipboard access was denied";
     }
 });
+copyShareLink.addEventListener("click", async () => {
+    try {
+        await syncShareUrl();
+        await navigator.clipboard.writeText(location.href);
+        copyShareLink.textContent = "Copied!";
+        setTimeout(() => { copyShareLink.textContent = "Copy share link"; }, 1200);
+    } catch {
+        status.textContent = "Clipboard access was denied";
+    }
+});
 themeToggle.addEventListener("click", () => {
     darkMode = !darkMode;
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
@@ -226,6 +285,7 @@ themeToggle.addEventListener("click", () => {
 source.addEventListener("input", () => {
     if (showingXml) return;
     dslSource = source.value;
+    scheduleShareUrl();
     updateEditor();
     clearTimeout(debounce);
     debounce = setTimeout(() => void render(), 300);
@@ -237,4 +297,20 @@ source.addEventListener("keyup", updateEditor);
 document.addEventListener("selectionchange", () => {
     if (document.activeElement === source) updateEditor();
 });
-void render();
+void (async () => {
+    const compressedDsl = shareParams.get("z");
+    if (compressedDsl) {
+        const initialRevision = shareRevision;
+        try {
+            const sharedDsl = await decompressDsl(compressedDsl);
+            if (shareRevision === initialRevision) {
+                source.value = sharedDsl;
+                dslSource = sharedDsl;
+            }
+        } catch {
+            status.textContent = "Could not read the shared DrawDSL link";
+        }
+    }
+    updateEditor();
+    await render();
+})();
