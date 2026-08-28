@@ -119,7 +119,8 @@ function updateEditor(): void {
         const kind = showingXml ? "plain" : highlightLine(line).kind;
         return `<span class="editor-line token-${kind}${index === activeLine ? " active" : ""}">${index + 1}</span>`;
     }).join("");
-    syntaxHighlight.style.transform = `translate(${-source.scrollLeft}px, ${-source.scrollTop}px)`;
+    syntaxHighlight.scrollTop = source.scrollTop;
+    syntaxHighlight.scrollLeft = source.scrollLeft;
     lineNumbers.scrollTop = source.scrollTop;
 }
 
