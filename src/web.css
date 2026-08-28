@@ -63,7 +63,7 @@ dialog::backdrop { background: #10152299; }
 .guide-content h3 { margin: 20px 0 8px; font-size: 15px; }
 .guide-content p { margin: 12px 0; line-height: 1.5; }
 .guide-content pre { margin: 10px 0; padding: 12px; overflow-x: auto; border-radius: 6px; background: #f1f4f9; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.guide-close { width: 32px; min-width: 32px; height: 32px; padding: 0; border: 1px solid #c5ccda; border-radius: 5px; color: inherit; background: transparent; cursor: pointer; font-size: 22px; line-height: 1; }
+.guide-close { width: auto; min-width: 0; height: 32px; padding: 0 12px; border: 1px solid #c5ccda; border-radius: 5px; color: inherit; background: transparent; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; }
 .guide-close:hover { background: #f1f4f9; }
 
 h1 { margin: 0; font-size: 20px; line-height: 24px; }
@@ -77,8 +77,10 @@ header span { color: #b8c3d9; font-size: 13px; line-height: 18px; }
 .saved-bar button:hover { background: #f1f4f9; }
 #saved-diagrams-list { display: flex; flex: 1; min-width: 0; gap: 6px; overflow-x: auto; }
 #saved-empty { align-self: center; color: #71809d; font-size: 13px; white-space: nowrap; }
-.saved-item { display: flex; flex: 0 0 auto; gap: 3px; }
-.saved-item .saved-load { max-width: 180px; overflow: hidden; text-align: left; text-overflow: ellipsis; }
+.saved-item { display: flex; flex: 0 0 auto; }
+.saved-item button { border-radius: 0; }
+.saved-item .saved-load { max-width: 180px; overflow: hidden; border-radius: 6px 0 0 6px; text-align: left; text-overflow: ellipsis; }
+.saved-item .saved-delete { margin-left: -1px; border-radius: 0 6px 6px 0; color: #b42318; }
 
 main {
     display: grid;
@@ -190,6 +192,7 @@ output {
 :root[data-theme="dark"] .saved-bar { border-color: #303b52; background: #151d2d; }
 :root[data-theme="dark"] .saved-bar input, :root[data-theme="dark"] .saved-bar button { border-color: #66738d; color: #edf2ff; background: #2a3853; }
 :root[data-theme="dark"] .saved-bar button:hover { background: #3a4a68; }
+:root[data-theme="dark"] .saved-item .saved-delete { color: #ffb4b4; }
 
 :root[data-theme="dark"] textarea {
     border-color: #3b4862;

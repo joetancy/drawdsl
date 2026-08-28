@@ -122,6 +122,7 @@ function renderSavedDiagrams(): void {
         load.textContent = `📂 ${diagram.name}`;
         load.addEventListener("click", () => loadSavedDiagram(diagram));
         const remove = document.createElement("button");
+        remove.className = "saved-delete";
         remove.type = "button";
         remove.textContent = "🗑️ Delete";
         remove.addEventListener("click", () => {
