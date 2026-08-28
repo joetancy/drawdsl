@@ -9,23 +9,28 @@
 </head>
 <body>
     <header>
-        <h1>DrawDSL</h1>
+        <h1><a href="./" title="Reset to the starter diagram">DrawDSL</a></h1>
         <span>Architecture diagrams from text</span>
         <div class="header-actions">
-            <button id="saved-toggle" type="button">Saved diagrams</button>
-            <button id="guide-toggle" type="button">DSL guide</button>
+            <button id="guide-toggle" type="button">📖 DSL guide</button>
             <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
         </div>
     </header>
+    <nav class="saved-bar" aria-label="Saved diagrams">
+        <strong>💾 Saved</strong>
+        <input id="save-name" type="text" maxlength="80" placeholder="Diagram name" aria-label="Diagram name">
+        <button id="save-current" type="button">💾 Save copy</button>
+        <div id="saved-diagrams-list" aria-live="polite"><span id="saved-empty">No saved diagrams yet.</span></div>
+    </nav>
     <main>
         <section class="editor-pane">
             <div class="editor-toolbar">
                 <label for="source">DSL</label>
                 <div class="editor-actions">
-                    <button id="format-dsl" type="button">Format DrawDSL</button>
-                    <button id="copy-share-link" type="button">Copy share link</button>
-                    <button id="xml-toggle" type="button" disabled>Show draw.io XML</button>
-                    <button id="copy-xml" type="button" disabled>Copy draw.io XML</button>
+                    <button id="format-dsl" type="button">✨ Format DrawDSL</button>
+                    <button id="copy-share-link" type="button">🔗 Copy share link</button>
+                    <button id="xml-toggle" type="button" disabled>🧾 Show draw.io XML</button>
+                    <button id="copy-xml" type="button" disabled>📋 Copy draw.io XML</button>
                 </div>
             </div>
             <div class="editor-input">
@@ -41,26 +46,11 @@
             <div id="preview"><span>Rendering…</span></div>
         </section>
     </main>
-    <dialog id="saved-diagrams" aria-labelledby="saved-diagrams-title">
-        <div class="saved-content">
-            <div class="guide-heading">
-                <h2 id="saved-diagrams-title">Saved diagrams</h2>
-                <button id="saved-close" class="guide-close" type="button" aria-label="Close saved diagrams">×</button>
-            </div>
-            <div class="saved-form">
-                <label for="save-name">Save current diagram</label>
-                <input id="save-name" type="text" maxlength="80" placeholder="Diagram name">
-                <button id="save-current" type="button">Save copy</button>
-            </div>
-            <p id="saved-empty">No saved diagrams yet.</p>
-            <div id="saved-diagrams-list" aria-live="polite"></div>
-        </div>
-    </dialog>
     <dialog id="guide" aria-labelledby="guide-title">
         <div class="guide-content">
             <div class="guide-heading">
                 <h2 id="guide-title">DrawDSL guide</h2>
-                <button id="guide-close" class="guide-close" type="button" aria-label="Close guide">×</button>
+                <button id="guide-close" class="guide-close" type="button" aria-label="Close guide">❌</button>
             </div>
             <p>Declare namespaced resources, place related resources in containers, then connect their IDs.</p>
             <pre><code>direction right

@@ -32,12 +32,9 @@ const lineNumbers = document.querySelector<HTMLPreElement>("#line-numbers")!;
 const syntaxHighlight = document.querySelector<HTMLPreElement>("#syntax-highlight")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
-const savedDiagrams = document.querySelector<HTMLDialogElement>("#saved-diagrams")!;
-const savedToggle = document.querySelector<HTMLButtonElement>("#saved-toggle")!;
-const savedClose = document.querySelector<HTMLButtonElement>("#saved-close")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
-const savedEmpty = document.querySelector<HTMLParagraphElement>("#saved-empty")!;
+const savedEmpty = document.querySelector<HTMLSpanElement>("#saved-empty")!;
 const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
 const guide = document.querySelector<HTMLDialogElement>("#guide")!;
 const guideToggle = document.querySelector<HTMLButtonElement>("#guide-toggle")!;
@@ -106,10 +103,9 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     source.setSelectionRange(0, 0);
     source.scrollTop = 0;
     source.scrollLeft = 0;
-    xmlToggle.textContent = "Show draw.io XML";
+    xmlToggle.textContent = "🧾 Show draw.io XML";
     scheduleShareUrl();
     updateEditor();
-    savedDiagrams.close();
     status.textContent = `Loaded ${diagram.name}`;
     void render();
 }
@@ -123,11 +119,11 @@ function renderSavedDiagrams(): void {
         const load = document.createElement("button");
         load.className = "saved-load";
         load.type = "button";
-        load.textContent = diagram.name;
+        load.textContent = `📂 ${diagram.name}`;
         load.addEventListener("click", () => loadSavedDiagram(diagram));
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.textContent = "Delete";
+        remove.textContent = "🗑️ Delete";
         remove.addEventListener("click", () => {
             if (!confirm(`Delete ${diagram.name}?`)) return;
             if (writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== diagram.id))) renderSavedDiagrams();
@@ -287,15 +283,7 @@ const shareParams = new URLSearchParams(location.hash.slice(1));
 source.value = shareParams.get("dsl") ?? starter;
 dslSource = source.value;
 updateEditor();
-savedToggle.addEventListener("click", () => {
-    renderSavedDiagrams();
-    savedDiagrams.showModal();
-    saveName.focus();
-});
-savedClose.addEventListener("click", () => savedDiagrams.close());
-savedDiagrams.addEventListener("click", (event) => {
-    if (event.target === savedDiagrams) savedDiagrams.close();
-});
+renderSavedDiagrams();
 saveCurrent.addEventListener("click", () => {
     const diagram: SavedDiagram = {
         id: savedDiagramId(),
@@ -323,7 +311,7 @@ formatDslButton.addEventListener("click", () => {
         scheduleShareUrl();
         updateEditor();
         source.readOnly = false;
-        xmlToggle.textContent = "Show draw.io XML";
+        xmlToggle.textContent = "🧾 Show draw.io XML";
         status.textContent = "Formatted successfully";
         void render();
     } catch (error) {
@@ -338,12 +326,12 @@ xmlToggle.addEventListener("click", () => {
         source.value = latestXml;
         updateEditor();
         source.readOnly = true;
-        xmlToggle.textContent = "Show DSL";
+        xmlToggle.textContent = "📝 Show DSL";
     } else {
         source.value = dslSource;
         updateEditor();
         source.readOnly = false;
-        xmlToggle.textContent = "Show draw.io XML";
+        xmlToggle.textContent = "🧾 Show draw.io XML";
     }
 });
 source.addEventListener("keydown", (event) => {
@@ -360,8 +348,8 @@ copyXml.addEventListener("click", async () => {
     if (!latestXml) return;
     try {
         await navigator.clipboard.writeText(latestXml);
-        copyXml.textContent = "Copied!";
-        setTimeout(() => { copyXml.textContent = "Copy draw.io XML"; }, 1200);
+        copyXml.textContent = "✅ Copied!";
+        setTimeout(() => { copyXml.textContent = "📋 Copy draw.io XML"; }, 1200);
     } catch {
         status.textContent = "Clipboard access was denied";
     }
@@ -370,8 +358,8 @@ copyShareLink.addEventListener("click", async () => {
     try {
         await syncShareUrl();
         await navigator.clipboard.writeText(location.href);
-        copyShareLink.textContent = "Copied!";
-        setTimeout(() => { copyShareLink.textContent = "Copy share link"; }, 1200);
+        copyShareLink.textContent = "✅ Copied!";
+        setTimeout(() => { copyShareLink.textContent = "🔗 Copy share link"; }, 1200);
     } catch {
         status.textContent = "Clipboard access was denied";
     }

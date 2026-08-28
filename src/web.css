@@ -65,24 +65,25 @@ dialog::backdrop { background: #10152299; }
 .guide-content pre { margin: 10px 0; padding: 12px; overflow-x: auto; border-radius: 6px; background: #f1f4f9; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .guide-close { width: 32px; min-width: 32px; height: 32px; padding: 0; border: 1px solid #c5ccda; border-radius: 5px; color: inherit; background: transparent; cursor: pointer; font-size: 22px; line-height: 1; }
 .guide-close:hover { background: #f1f4f9; }
-.saved-content { padding: 24px; overflow: auto; }
-.saved-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 20px; }
-.saved-form label { grid-column: 1 / -1; }
-.saved-form input { min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: transparent; font: inherit; font-size: 13px; }
-.saved-form button, .saved-item button { height: 32px; padding: 0 12px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: transparent; cursor: pointer; font: inherit; font-size: 12px; }
-.saved-form button:hover, .saved-item button:hover { background: #f1f4f9; }
-#saved-empty { margin: 20px 0 0; color: #71809d; }
-#saved-diagrams-list { display: grid; gap: 8px; margin-top: 12px; }
-.saved-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.saved-item .saved-load { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 
 h1 { margin: 0; font-size: 20px; line-height: 24px; }
+h1 a { color: inherit; text-decoration: none; }
 header span { color: #b8c3d9; font-size: 13px; line-height: 18px; }
+
+.saved-bar { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 24px; border-bottom: 1px solid #d8deea; background: white; }
+.saved-bar strong { flex: 0 0 auto; font-size: 13px; }
+.saved-bar input { width: 150px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: #fbfcfe; font: inherit; font-size: 13px; }
+.saved-bar button { height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: #34405a; background: white; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
+.saved-bar button:hover { background: #f1f4f9; }
+#saved-diagrams-list { display: flex; flex: 1; min-width: 0; gap: 6px; overflow-x: auto; }
+#saved-empty { align-self: center; color: #71809d; font-size: 13px; white-space: nowrap; }
+.saved-item { display: flex; flex: 0 0 auto; gap: 3px; }
+.saved-item .saved-load { max-width: 180px; overflow: hidden; text-align: left; text-overflow: ellipsis; }
 
 main {
     display: grid;
     grid-template-columns: minmax(320px, 40%) 1fr;
-    height: calc(100vh - 56px);
+    height: calc(100vh - 104px);
 }
 
 .editor-pane,
@@ -173,6 +174,7 @@ output {
 
     .editor-pane { border-right: 0; border-bottom: 1px solid #d8deea; }
     textarea { resize: vertical; }
+    .saved-bar { padding: 8px 16px; overflow-x: auto; }
 }
 
 :root[data-theme="dark"] {
@@ -184,6 +186,10 @@ output {
     border-color: #303b52;
     background: #151d2d;
 }
+
+:root[data-theme="dark"] .saved-bar { border-color: #303b52; background: #151d2d; }
+:root[data-theme="dark"] .saved-bar input, :root[data-theme="dark"] .saved-bar button { border-color: #66738d; color: #edf2ff; background: #2a3853; }
+:root[data-theme="dark"] .saved-bar button:hover { background: #3a4a68; }
 
 :root[data-theme="dark"] textarea {
     border-color: #3b4862;
@@ -217,5 +223,3 @@ output {
 :root[data-theme="dark"] .editor-toolbar button:hover:not(:disabled) { background: #3a4a68; }
 :root[data-theme="dark"] dialog { color: #edf2ff; background: #151d2d; }
 :root[data-theme="dark"] .guide-content pre { background: #101522; }
-:root[data-theme="dark"] .saved-form input, :root[data-theme="dark"] .saved-form button, :root[data-theme="dark"] .saved-item button { border-color: #66738d; background: #101522; }
-:root[data-theme="dark"] .saved-form button:hover, :root[data-theme="dark"] .saved-item button:hover { background: #2a3853; }
