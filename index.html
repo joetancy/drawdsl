@@ -46,6 +46,16 @@
             <div id="preview"><span>Rendering…</span></div>
         </section>
     </main>
+    <dialog id="delete-confirm" aria-labelledby="delete-confirm-title">
+        <div class="confirm-content">
+            <h2 id="delete-confirm-title">Delete saved diagram?</h2>
+            <p>Are you sure you want to delete <strong id="delete-confirm-name"></strong>?</p>
+            <div class="confirm-actions">
+                <button id="delete-cancel" type="button">Cancel</button>
+                <button id="delete-accept" type="button">🗑️ Delete</button>
+            </div>
+        </div>
+    </dialog>
     <dialog id="guide" aria-labelledby="guide-title">
         <div class="guide-content">
             <div class="guide-heading">

@@ -36,6 +36,10 @@ const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
 const savedEmpty = document.querySelector<HTMLSpanElement>("#saved-empty")!;
 const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
+const deleteConfirm = document.querySelector<HTMLDialogElement>("#delete-confirm")!;
+const deleteConfirmName = document.querySelector<HTMLElement>("#delete-confirm-name")!;
+const deleteCancel = document.querySelector<HTMLButtonElement>("#delete-cancel")!;
+const deleteAccept = document.querySelector<HTMLButtonElement>("#delete-accept")!;
 const guide = document.querySelector<HTMLDialogElement>("#guide")!;
 const guideToggle = document.querySelector<HTMLButtonElement>("#guide-toggle")!;
 const guideClose = document.querySelector<HTMLButtonElement>("#guide-close")!;
@@ -61,6 +65,7 @@ let showingXml = false;
 let shareRevision = 0;
 let shareDebounce: ReturnType<typeof setTimeout>;
 const savedDiagramsKey = "drawdsl.saved-diagrams.v1";
+let pendingDelete: SavedDiagram | undefined;
 
 type SavedDiagram = { id: string; name: string; source: string };
 
@@ -126,8 +131,9 @@ function renderSavedDiagrams(): void {
         remove.type = "button";
         remove.textContent = "🗑️ Delete";
         remove.addEventListener("click", () => {
-            if (!confirm(`Delete ${diagram.name}?`)) return;
-            if (writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== diagram.id))) renderSavedDiagrams();
+            pendingDelete = diagram;
+            deleteConfirmName.textContent = diagram.name;
+            deleteConfirm.showModal();
         });
         item.append(load, remove);
         return item;
@@ -285,6 +291,27 @@ source.value = shareParams.get("dsl") ?? starter;
 dslSource = source.value;
 updateEditor();
 renderSavedDiagrams();
+deleteCancel.addEventListener("click", () => {
+    pendingDelete = undefined;
+    deleteConfirm.close();
+});
+deleteAccept.addEventListener("click", () => {
+    if (!pendingDelete) return;
+    const deletedName = pendingDelete.name;
+    if (!writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== pendingDelete!.id))) {
+        return;
+    }
+    pendingDelete = undefined;
+    deleteConfirm.close();
+    renderSavedDiagrams();
+    status.textContent = `Deleted ${deletedName}`;
+});
+deleteConfirm.addEventListener("click", (event) => {
+    if (event.target === deleteConfirm) {
+        pendingDelete = undefined;
+        deleteConfirm.close();
+    }
+});
 saveCurrent.addEventListener("click", () => {
     const diagram: SavedDiagram = {
         id: savedDiagramId(),
