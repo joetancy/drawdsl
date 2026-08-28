@@ -12,6 +12,7 @@
         <h1>DrawDSL</h1>
         <span>Architecture diagrams from text</span>
         <div class="header-actions">
+            <button id="saved-toggle" type="button">Saved diagrams</button>
             <button id="guide-toggle" type="button">DSL guide</button>
             <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
         </div>
@@ -40,6 +41,21 @@
             <div id="preview"><span>Rendering…</span></div>
         </section>
     </main>
+    <dialog id="saved-diagrams" aria-labelledby="saved-diagrams-title">
+        <div class="saved-content">
+            <div class="guide-heading">
+                <h2 id="saved-diagrams-title">Saved diagrams</h2>
+                <button id="saved-close" class="guide-close" type="button" aria-label="Close saved diagrams">×</button>
+            </div>
+            <div class="saved-form">
+                <label for="save-name">Save current diagram</label>
+                <input id="save-name" type="text" maxlength="80" placeholder="Diagram name">
+                <button id="save-current" type="button">Save copy</button>
+            </div>
+            <p id="saved-empty">No saved diagrams yet.</p>
+            <div id="saved-diagrams-list" aria-live="polite"></div>
+        </div>
+    </dialog>
     <dialog id="guide" aria-labelledby="guide-title">
         <div class="guide-content">
             <div class="guide-heading">
@@ -70,6 +86,7 @@ aws:cloud cloud "AWS Cloud" {
             <p>Use <code>#</code> for comments. Labels support <code>\n</code>, <code>\"</code>, and <code>\\</code> escapes. Layout directives include <code>direction</code>, <code>node-spacing</code>, <code>layer-spacing</code>, <code>edge-spacing</code>, <code>padding</code>, and container-only <code>grid-columns</code>.</p>
             <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram.</p>
             <p>Use <strong>Copy share link</strong> to copy a self-contained URL for this DSL. Links are compressed when possible and work without a backend; anyone with the link can read the DSL, so do not include secrets.</p>
+            <p>Use <strong>Saved diagrams</strong> to keep named copies in this browser's local storage. They stay on this device and browser profile until you delete them.</p>
         </div>
     </dialog>
 </body>

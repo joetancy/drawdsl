@@ -65,6 +65,16 @@ dialog::backdrop { background: #10152299; }
 .guide-content pre { margin: 10px 0; padding: 12px; overflow-x: auto; border-radius: 6px; background: #f1f4f9; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .guide-close { width: 32px; min-width: 32px; height: 32px; padding: 0; border: 1px solid #c5ccda; border-radius: 5px; color: inherit; background: transparent; cursor: pointer; font-size: 22px; line-height: 1; }
 .guide-close:hover { background: #f1f4f9; }
+.saved-content { padding: 24px; overflow: auto; }
+.saved-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 20px; }
+.saved-form label { grid-column: 1 / -1; }
+.saved-form input { min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: transparent; font: inherit; font-size: 13px; }
+.saved-form button, .saved-item button { height: 32px; padding: 0 12px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: transparent; cursor: pointer; font: inherit; font-size: 12px; }
+.saved-form button:hover, .saved-item button:hover { background: #f1f4f9; }
+#saved-empty { margin: 20px 0 0; color: #71809d; }
+#saved-diagrams-list { display: grid; gap: 8px; margin-top: 12px; }
+.saved-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.saved-item .saved-load { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 
 h1 { margin: 0; font-size: 20px; line-height: 24px; }
 header span { color: #b8c3d9; font-size: 13px; line-height: 18px; }
@@ -207,3 +217,5 @@ output {
 :root[data-theme="dark"] .editor-toolbar button:hover:not(:disabled) { background: #3a4a68; }
 :root[data-theme="dark"] dialog { color: #edf2ff; background: #151d2d; }
 :root[data-theme="dark"] .guide-content pre { background: #101522; }
+:root[data-theme="dark"] .saved-form input, :root[data-theme="dark"] .saved-form button, :root[data-theme="dark"] .saved-item button { border-color: #66738d; background: #101522; }
+:root[data-theme="dark"] .saved-form button:hover, :root[data-theme="dark"] .saved-item button:hover { background: #2a3853; }

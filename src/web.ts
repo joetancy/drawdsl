@@ -32,6 +32,13 @@ const lineNumbers = document.querySelector<HTMLPreElement>("#line-numbers")!;
 const syntaxHighlight = document.querySelector<HTMLPreElement>("#syntax-highlight")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
+const savedDiagrams = document.querySelector<HTMLDialogElement>("#saved-diagrams")!;
+const savedToggle = document.querySelector<HTMLButtonElement>("#saved-toggle")!;
+const savedClose = document.querySelector<HTMLButtonElement>("#saved-close")!;
+const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
+const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
+const savedEmpty = document.querySelector<HTMLParagraphElement>("#saved-empty")!;
+const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
 const guide = document.querySelector<HTMLDialogElement>("#guide")!;
 const guideToggle = document.querySelector<HTMLButtonElement>("#guide-toggle")!;
 const guideClose = document.querySelector<HTMLButtonElement>("#guide-close")!;
@@ -56,6 +63,79 @@ let dslSource = "";
 let showingXml = false;
 let shareRevision = 0;
 let shareDebounce: ReturnType<typeof setTimeout>;
+const savedDiagramsKey = "drawdsl.saved-diagrams.v1";
+
+type SavedDiagram = { id: string; name: string; source: string };
+
+function isSavedDiagram(value: unknown): value is SavedDiagram {
+    if (!value || typeof value !== "object") return false;
+    const diagram = value as Record<string, unknown>;
+    return typeof diagram.id === "string" && typeof diagram.name === "string" && typeof diagram.source === "string";
+}
+
+function readSavedDiagrams(): SavedDiagram[] {
+    try {
+        const saved = localStorage.getItem(savedDiagramsKey);
+        if (!saved) return [];
+        const parsed: unknown = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.filter(isSavedDiagram) : [];
+    } catch {
+        return [];
+    }
+}
+
+function writeSavedDiagrams(diagrams: SavedDiagram[]): boolean {
+    try {
+        localStorage.setItem(savedDiagramsKey, JSON.stringify(diagrams));
+        return true;
+    } catch {
+        status.textContent = "Could not save diagram locally";
+        return false;
+    }
+}
+
+function savedDiagramId(): string {
+    return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function loadSavedDiagram(diagram: SavedDiagram): void {
+    showingXml = false;
+    dslSource = diagram.source;
+    source.value = diagram.source;
+    source.readOnly = false;
+    source.setSelectionRange(0, 0);
+    source.scrollTop = 0;
+    source.scrollLeft = 0;
+    xmlToggle.textContent = "Show draw.io XML";
+    scheduleShareUrl();
+    updateEditor();
+    savedDiagrams.close();
+    status.textContent = `Loaded ${diagram.name}`;
+    void render();
+}
+
+function renderSavedDiagrams(): void {
+    const diagrams = readSavedDiagrams();
+    savedEmpty.hidden = diagrams.length > 0;
+    savedDiagramsList.replaceChildren(...diagrams.map((diagram) => {
+        const item = document.createElement("div");
+        item.className = "saved-item";
+        const load = document.createElement("button");
+        load.className = "saved-load";
+        load.type = "button";
+        load.textContent = diagram.name;
+        load.addEventListener("click", () => loadSavedDiagram(diagram));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Delete";
+        remove.addEventListener("click", () => {
+            if (!confirm(`Delete ${diagram.name}?`)) return;
+            if (writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== diagram.id))) renderSavedDiagrams();
+        });
+        item.append(load, remove);
+        return item;
+    }));
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
     let binary = "";
@@ -207,6 +287,27 @@ const shareParams = new URLSearchParams(location.hash.slice(1));
 source.value = shareParams.get("dsl") ?? starter;
 dslSource = source.value;
 updateEditor();
+savedToggle.addEventListener("click", () => {
+    renderSavedDiagrams();
+    savedDiagrams.showModal();
+    saveName.focus();
+});
+savedClose.addEventListener("click", () => savedDiagrams.close());
+savedDiagrams.addEventListener("click", (event) => {
+    if (event.target === savedDiagrams) savedDiagrams.close();
+});
+saveCurrent.addEventListener("click", () => {
+    const diagram: SavedDiagram = {
+        id: savedDiagramId(),
+        name: saveName.value.trim() || "Untitled diagram",
+        source: dslSource,
+    };
+    const diagrams = readSavedDiagrams();
+    if (!writeSavedDiagrams([diagram, ...diagrams])) return;
+    saveName.value = "";
+    renderSavedDiagrams();
+    status.textContent = `Saved ${diagram.name} locally`;
+});
 guideToggle.addEventListener("click", () => guide.showModal());
 guideClose.addEventListener("click", () => guide.close());
 guide.addEventListener("click", (event) => {
