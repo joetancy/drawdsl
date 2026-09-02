@@ -48,6 +48,7 @@ header button:disabled { cursor: not-allowed; opacity: 0.5; }
 dialog {
     width: min(680px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
+    overflow: hidden;
     padding: 0;
     border: 0;
     border-radius: 10px;
@@ -57,10 +58,11 @@ dialog {
 }
 
 dialog::backdrop { background: #10152299; }
-.guide-content { padding: 24px; overflow: auto; }
+.guide-content { max-height: calc(100vh - 32px); padding: 24px; overflow: auto; }
 .guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .guide-heading h2 { margin: 0; font-size: 21px; }
-.skill-content { width: min(900px, calc(100vw - 32px)); }
+#skill { width: min(900px, calc(100vw - 32px)); }
+.skill-content pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .skill-actions { display: flex; gap: 8px; }
 .guide-content h3 { margin: 20px 0 8px; font-size: 15px; }
 .guide-content p { margin: 12px 0; line-height: 1.5; }
@@ -84,11 +86,13 @@ header span { color: #b8c3d9; font-size: 13px; line-height: 18px; }
 .saved-bar input { width: 150px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: #fbfcfe; font: inherit; font-size: 13px; }
 .saved-bar button { height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: #34405a; background: white; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
 .saved-bar button:hover { background: #f1f4f9; }
+.saved-current-status { flex: 0 0 auto; color: #71809d; font-size: 12px; white-space: nowrap; }
 #saved-diagrams-list { display: flex; flex: 1; min-width: 0; gap: 6px; overflow-x: auto; }
 #saved-empty { align-self: center; color: #71809d; font-size: 13px; white-space: nowrap; }
 .saved-item { display: flex; flex: 0 0 auto; }
 .saved-item button { border-radius: 0; }
 .saved-item .saved-load { max-width: 180px; overflow: hidden; border-radius: 6px 0 0 6px; text-align: left; text-overflow: ellipsis; }
+.saved-item.active .saved-load { border-color: #527fff; color: #24459a; }
 .saved-item .saved-delete { margin-left: -1px; border-radius: 0 6px 6px 0; color: #b42318; }
 
 main {
@@ -201,6 +205,8 @@ output {
 :root[data-theme="dark"] .saved-bar { border-color: #303b52; background: #151d2d; }
 :root[data-theme="dark"] .saved-bar input, :root[data-theme="dark"] .saved-bar button { border-color: #66738d; color: #edf2ff; background: #2a3853; }
 :root[data-theme="dark"] .saved-bar button:hover { background: #3a4a68; }
+:root[data-theme="dark"] .saved-current-status { color: #b8c3d9; }
+:root[data-theme="dark"] .saved-item.active .saved-load { border-color: #7fa1ff; color: #d9e2ff; }
 :root[data-theme="dark"] .saved-item .saved-delete { color: #ffb4b4; }
 
 :root[data-theme="dark"] textarea {

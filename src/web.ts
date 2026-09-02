@@ -34,6 +34,8 @@ const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
+const saveCopy = document.querySelector<HTMLButtonElement>("#save-copy")!;
+const savedCurrentStatus = document.querySelector<HTMLSpanElement>("#saved-current-status")!;
 const savedEmpty = document.querySelector<HTMLSpanElement>("#saved-empty")!;
 const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
 const deleteConfirm = document.querySelector<HTMLDialogElement>("#delete-confirm")!;
@@ -71,6 +73,7 @@ let shareRevision = 0;
 let shareDebounce: ReturnType<typeof setTimeout>;
 const savedDiagramsKey = "drawdsl.saved-diagrams.v1";
 let pendingDelete: SavedDiagram | undefined;
+let loadedDiagramId: string | undefined;
 
 type SavedDiagram = { id: string; name: string; source: string };
 
@@ -105,7 +108,14 @@ function savedDiagramId(): string {
     return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function setLoadedDiagram(diagram?: SavedDiagram): void {
+    loadedDiagramId = diagram?.id;
+    saveCurrent.disabled = !diagram;
+    savedCurrentStatus.textContent = diagram ? `Loaded: ${diagram.name}` : "Not saved";
+}
+
 function loadSavedDiagram(diagram: SavedDiagram): void {
+    setLoadedDiagram(diagram);
     showingXml = false;
     dslSource = diagram.source;
     source.value = diagram.source;
@@ -125,11 +135,12 @@ function renderSavedDiagrams(): void {
     savedEmpty.hidden = diagrams.length > 0;
     savedDiagramsList.replaceChildren(...diagrams.map((diagram) => {
         const item = document.createElement("div");
-        item.className = "saved-item";
+        item.className = `saved-item${diagram.id === loadedDiagramId ? " active" : ""}`;
         const load = document.createElement("button");
         load.className = "saved-load";
         load.type = "button";
         load.textContent = `📂 ${diagram.name}`;
+        load.setAttribute("aria-current", String(diagram.id === loadedDiagramId));
         load.addEventListener("click", () => loadSavedDiagram(diagram));
         const remove = document.createElement("button");
         remove.className = "saved-delete";
@@ -302,14 +313,15 @@ deleteCancel.addEventListener("click", () => {
 });
 deleteAccept.addEventListener("click", () => {
     if (!pendingDelete) return;
-    const deletedName = pendingDelete.name;
-    if (!writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== pendingDelete!.id))) {
+    const deletedDiagram = pendingDelete;
+    if (!writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== deletedDiagram.id))) {
         return;
     }
+    if (loadedDiagramId === deletedDiagram.id) setLoadedDiagram();
     pendingDelete = undefined;
     deleteConfirm.close();
     renderSavedDiagrams();
-    status.textContent = `Deleted ${deletedName}`;
+    status.textContent = `Deleted ${deletedDiagram.name}`;
 });
 deleteConfirm.addEventListener("click", (event) => {
     if (event.target === deleteConfirm) {
@@ -318,6 +330,22 @@ deleteConfirm.addEventListener("click", (event) => {
     }
 });
 saveCurrent.addEventListener("click", () => {
+    if (!loadedDiagramId) return;
+    const diagrams = readSavedDiagrams();
+    const index = diagrams.findIndex((diagram) => diagram.id === loadedDiagramId);
+    if (index < 0) {
+        setLoadedDiagram();
+        renderSavedDiagrams();
+        status.textContent = "Loaded diagram no longer exists";
+        return;
+    }
+    const diagram = { ...diagrams[index]!, source: dslSource };
+    diagrams[index] = diagram;
+    if (!writeSavedDiagrams(diagrams)) return;
+    renderSavedDiagrams();
+    status.textContent = `Saved ${diagram.name} locally`;
+});
+saveCopy.addEventListener("click", () => {
     const diagram: SavedDiagram = {
         id: savedDiagramId(),
         name: saveName.value.trim() || "Untitled diagram",
@@ -325,6 +353,7 @@ saveCurrent.addEventListener("click", () => {
     };
     const diagrams = readSavedDiagrams();
     if (!writeSavedDiagrams([diagram, ...diagrams])) return;
+    setLoadedDiagram(diagram);
     saveName.value = "";
     renderSavedDiagrams();
     status.textContent = `Saved ${diagram.name} locally`;

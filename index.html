@@ -20,7 +20,9 @@
     <nav class="saved-bar" aria-label="Saved diagrams">
         <strong>💾 Saved</strong>
         <input id="save-name" type="text" maxlength="80" placeholder="Diagram name" aria-label="Diagram name">
-        <button id="save-current" type="button">💾 Save copy</button>
+        <button id="save-current" type="button" disabled>💾 Save</button>
+        <button id="save-copy" type="button">📄 Save copy</button>
+        <span id="saved-current-status" class="saved-current-status" aria-live="polite">Not saved</span>
         <div id="saved-diagrams-list" aria-live="polite"><span id="saved-empty">No saved diagrams yet.</span></div>
     </nav>
     <main>
