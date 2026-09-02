@@ -84,6 +84,16 @@ aws:cloud cloud "AWS Cloud" {
     }
 }</code></pre>
             <p>Use <code>#</code> for comments. Labels support <code>\n</code>, <code>\"</code>, and <code>\\</code> escapes. Layout directives include <code>direction</code>, <code>node-spacing</code>, <code>layer-spacing</code>, <code>edge-spacing</code>, <code>padding</code>, and container-only <code>grid-columns</code>.</p>
+            <h3>Grid layout</h3>
+            <p>Use <code>core:layout</code> for an invisible structural container. Set <code>grid-columns</code> to arrange its direct children in declaration order; nested layout containers can define separate columns without adding a visible group.</p>
+            <pre><code>core:layout grid {
+    grid-columns 5
+    core:layout far-left {
+        grid-columns 1
+        aws:tgw tgw-rhmp-eznetw-internet
+    }
+}</code></pre>
+            <p>Children are placed left to right, then top to bottom, with smaller items centered in their cells. Resources inside the grid can still be connected, but <code>core:layout</code> containers cannot be edge endpoints.</p>
             <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram.</p>
             <p>Use <strong>Copy share link</strong> to copy a self-contained URL for this DSL. Links are compressed when possible and work without a backend; anyone with the link can read the DSL, so do not include secrets.</p>
             <p>Use <strong>Saved diagrams</strong> to keep named copies in this browser's local storage. They stay on this device and browser profile until you delete them.</p>
