@@ -60,6 +60,8 @@ dialog::backdrop { background: #10152299; }
 .guide-content { padding: 24px; overflow: auto; }
 .guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .guide-heading h2 { margin: 0; font-size: 21px; }
+.skill-content { width: min(900px, calc(100vw - 32px)); }
+.skill-actions { display: flex; gap: 8px; }
 .guide-content h3 { margin: 20px 0 8px; font-size: 15px; }
 .guide-content p { margin: 12px 0; line-height: 1.5; }
 .guide-content pre { margin: 10px 0; padding: 12px; overflow-x: auto; border-radius: 6px; background: #f1f4f9; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }

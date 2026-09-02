@@ -43,6 +43,11 @@ const deleteAccept = document.querySelector<HTMLButtonElement>("#delete-accept")
 const guide = document.querySelector<HTMLDialogElement>("#guide")!;
 const guideToggle = document.querySelector<HTMLButtonElement>("#guide-toggle")!;
 const guideClose = document.querySelector<HTMLButtonElement>("#guide-close")!;
+const skill = document.querySelector<HTMLDialogElement>("#skill")!;
+const skillToggle = document.querySelector<HTMLButtonElement>("#skill-toggle")!;
+const skillClose = document.querySelector<HTMLButtonElement>("#skill-close")!;
+const copySkill = document.querySelector<HTMLButtonElement>("#copy-skill")!;
+const skillSource = document.querySelector<HTMLElement>("#skill-source")!;
 const formatDslButton = document.querySelector<HTMLButtonElement>("#format-dsl")!;
 const copyShareLink = document.querySelector<HTMLButtonElement>("#copy-share-link")!;
 const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
@@ -328,6 +333,20 @@ guideToggle.addEventListener("click", () => guide.showModal());
 guideClose.addEventListener("click", () => guide.close());
 guide.addEventListener("click", (event) => {
     if (event.target === guide) guide.close();
+});
+skillToggle.addEventListener("click", () => skill.showModal());
+skillClose.addEventListener("click", () => skill.close());
+skill.addEventListener("click", (event) => {
+    if (event.target === skill) skill.close();
+});
+copySkill.addEventListener("click", async () => {
+    try {
+        await navigator.clipboard.writeText(skillSource.textContent ?? "");
+        copySkill.textContent = "✅ Copied!";
+        setTimeout(() => { copySkill.textContent = "📋 Copy"; }, 1200);
+    } catch {
+        copySkill.textContent = "Clipboard denied";
+    }
 });
 formatDslButton.addEventListener("click", () => {
     try {
