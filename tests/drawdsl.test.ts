@@ -318,6 +318,81 @@ test("global edge spacing preserves a clear straight route", () => {
     assert.deepEqual(routes.get("straight")!.bendPoints, []);
 });
 
+test("route cleanup removes offset jogs while preserving ports, obstacles, and separate edges", () => {
+    const symbol = resolveSymbol({ namespace: "aws", name: "lambda" });
+    for (const vertical of [false, true]) {
+        const point = (x: number, y: number) => vertical ? { x: y, y: x } : { x, y };
+        const nodes = [
+            { id: "source", symbol: symbol.ref, definition: symbol.definition, label: "Source", ...point(0, 0), width: 80, height: 80, declarationOrder: 0 },
+            { id: "target", symbol: symbol.ref, definition: symbol.definition, label: "Target", ...point(300, 0), width: 80, height: 80, declarationOrder: 1 },
+        ];
+        const edge = { id: "edge", source: "source", target: "target", operator: "-->" as const, declarationOrder: 0 };
+        for (const fixed of [false, true]) {
+            const routes = new Map([[edge.id, { sourcePoint: point(80, 30), bendPoints: [point(180, 30), point(180, 40)], targetPoint: point(300, 40) }]]);
+            const pinned = { ...edge, sourceSide: vertical ? "bottom" as const : "right" as const, targetSide: vertical ? "top" as const : "left" as const };
+            enforceGlobalEdgeSpacing(nodes, [fixed ? pinned : edge], routes, DEFAULT_LAYOUT_CONFIG);
+            assert.equal(routes.get(edge.id)!.bendPoints.length, fixed ? 2 : 0);
+            assert.deepEqual(routes.get(edge.id)!.targetPoint, point(300, fixed ? 40 : 30));
+        }
+        const blocker = { ...nodes[0]!, id: "blocker", ...point(160, 0), width: vertical ? 80 : 40, height: vertical ? 40 : 80 };
+        const detour = [point(120, 30), point(120, -60), point(260, -60), point(260, 40)];
+        const routes = new Map([[edge.id, { sourcePoint: point(80, 30), bendPoints: detour, targetPoint: point(300, 40) }]]);
+        enforceGlobalEdgeSpacing([...nodes, blocker], [edge], routes, DEFAULT_LAYOUT_CONFIG);
+        assert.deepEqual(routes.get(edge.id)!.bendPoints, detour);
+
+        const other = { ...edge, id: "other", declarationOrder: 1 };
+        const shared = new Map([
+            [edge.id, { sourcePoint: point(80, 30), bendPoints: [point(180, 30), point(180, 40)], targetPoint: point(300, 40) }],
+            [other.id, { sourcePoint: point(80, 30), bendPoints: [], targetPoint: point(300, 30) }],
+        ]);
+        enforceGlobalEdgeSpacing(nodes, [edge, other], shared, DEFAULT_LAYOUT_CONFIG);
+        assert.deepEqual(shared.get(edge.id)!.sourcePoint, point(80, 40));
+        assert.deepEqual(shared.get(edge.id)!.bendPoints, []);
+    }
+    const edge = { id: "internal", source: "source", target: "target", operator: "-->" as const, declarationOrder: 0 };
+    const routes = new Map([[edge.id, { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 100 }, { x: 100, y: 100 }, { x: 100, y: 110 }, { x: 300, y: 110 }], targetPoint: { x: 300, y: 200 } }]]);
+    enforceGlobalEdgeSpacing([], [edge], routes, DEFAULT_LAYOUT_CONFIG);
+    assert.equal(routes.get(edge.id)!.bendPoints.length, 2);
+});
+
+test("edges clear visible group borders without blocking perpendicular crossings", () => {
+    const group = resolveSymbol({ namespace: "core", name: "group" });
+    const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
+    for (const vertical of [false, true]) {
+        for (const mirrored of [false, true]) {
+            const point = (x: number, y: number) => vertical ? { x: mirrored ? -y : y, y: x } : { x, y: mirrored ? -y : y };
+            const rect = (x: number, y: number, width: number, height: number) => {
+                const a = point(x, y);
+                const b = point(x + width, y + height);
+                return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+            };
+            const container = { id: "group", symbol: group.ref, definition: group.definition, label: "Group", ...rect(100, 100, 300, 300), declarationOrder: 0 };
+            const source = { id: "source", symbol: icon.ref, definition: icon.definition, label: "Source", ...rect(-40, -80, 80, 80), declarationOrder: 1 };
+            const target = { ...source, id: "target", parentId: "group", ...rect(260, 200, 80, 80), declarationOrder: 2 };
+            const edge = { id: "edge", source: "source", target: "target", operator: "-->" as const, declarationOrder: 0 };
+            for (const hidden of [false, true]) {
+                const nodes = [{ ...container, definition: { ...container.definition, layoutOnly: hidden } }, source, target];
+                const routes = new Map([[edge.id, { sourcePoint: point(0, 0), bendPoints: [point(0, 100), point(300, 100)], targetPoint: point(300, 200) }]]);
+                enforceGlobalEdgeSpacing(nodes, [edge], routes, DEFAULT_LAYOUT_CONFIG);
+                assert.deepEqual(routes.get(edge.id)!.bendPoints, [point(0, hidden ? 100 : mirrored ? 140 : 60), point(300, hidden ? 100 : mirrored ? 140 : 60)]);
+                assert.deepEqual(routes.get(edge.id)!.sourcePoint, point(0, 0));
+                assert.deepEqual(routes.get(edge.id)!.targetPoint, point(300, 200));
+                // Straightening and lane spacing must not put the edge back on the border.
+                enforceGlobalEdgeSpacing(nodes, [edge], routes, DEFAULT_LAYOUT_CONFIG);
+                assert.deepEqual(routes.get(edge.id)!.bendPoints, [point(0, hidden ? 100 : mirrored ? 140 : 60), point(300, hidden ? 100 : mirrored ? 140 : 60)]);
+            }
+            const blocker = { ...source, id: "blocker", ...rect(100, -20, 100, 80) };
+            const routes = new Map([[edge.id, { sourcePoint: point(0, 0), bendPoints: [point(0, 100), point(300, 100)], targetPoint: point(300, 200) }]]);
+            enforceGlobalEdgeSpacing([container, source, target, blocker], [edge], routes, DEFAULT_LAYOUT_CONFIG);
+            assert.deepEqual(routes.get(edge.id)!.bendPoints, [point(0, 140), point(300, 140)]);
+
+            const crossing = new Map([[edge.id, { sourcePoint: point(300, 0), bendPoints: [], targetPoint: point(300, 200) }]]);
+            enforceGlobalEdgeSpacing([container, { ...source, ...rect(260, -80, 80, 80) }, target], [edge], crossing, DEFAULT_LAYOUT_CONFIG);
+            assert.deepEqual(crossing.get(edge.id)!.bendPoints, []);
+        }
+    }
+});
+
 test("container-scoped ELK direction controls local layered layout", async () => {
     const ast = parseDsl(`direction right
 core:group workers {
