@@ -219,6 +219,45 @@ test("grid columns preserve declaration order and center mixed-size groups", asy
     assert.equal(right.x - (centre.x + centre.width), DEFAULT_LAYOUT_CONFIG.nodeSpacing.container);
 });
 
+test("containers use square-ish grids unless a local direction is explicit", async () => {
+    const ast = parseDsl(`core:group automatic {
+    aws:lambda one
+    aws:lambda two
+    aws:lambda three
+    aws:lambda four
+    aws:lambda five
+    aws:lambda six
+}
+core:group nine {
+    aws:lambda a
+    aws:lambda b
+    aws:lambda c
+    aws:lambda d
+    aws:lambda e
+    aws:lambda f
+    aws:lambda g
+    aws:lambda h
+    aws:lambda i
+}
+core:group directed {
+    direction down
+    aws:lambda first
+    aws:lambda second
+    first --> second
+}`);
+    const layout = await layoutDocument(ast);
+    const automatic = layout.nodes.filter((node) => node.parentId === "automatic");
+    assert.equal(new Set(automatic.map((node) => node.x)).size, 3);
+    assert.equal(new Set(automatic.map((node) => node.y)).size, 2);
+    const nine = layout.nodes.filter((node) => node.parentId === "nine");
+    assert.equal(new Set(nine.map((node) => node.x)).size, 3);
+    assert.equal(new Set(nine.map((node) => node.y)).size, 3);
+    const first = layout.nodes.find((node) => node.id === "first")!;
+    const second = layout.nodes.find((node) => node.id === "second")!;
+    assert.equal(first.x, second.x);
+    assert.ok(first.y < second.y);
+});
+
 test("Libavoid routes around unrelated visible containers", async () => {
     const ast = parseDsl(`core:layout row {
     grid-columns 3
@@ -250,7 +289,7 @@ source --> target`);
     }
 });
 
-test("global edge spacing separates close route segments from different routing passes", () => {
+test("global edge spacing does not add bends solely to separate routes", () => {
     const edges = [
         { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
         { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
@@ -262,12 +301,21 @@ test("global edge spacing separates close route segments from different routing 
 
     enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
 
-    const horizontalSegmentY = (route: { sourcePoint: { x: number; y: number }; bendPoints: { x: number; y: number }[]; targetPoint: { x: number; y: number } }): number => {
-        const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
-        const segment = points.find((point, index) => index > 0 && Math.abs(point.x - points[index - 1]!.x) >= 100 && point.y === points[index - 1]!.y);
-        return segment!.y;
-    };
-    assert.ok(Math.abs(horizontalSegmentY(routes.get("first")!) - horizontalSegmentY(routes.get("second")!)) >= DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+    assert.equal(routes.get("first")!.bendPoints.length, 2);
+    assert.equal(routes.get("second")!.bendPoints.length, 2);
+});
+
+test("global edge spacing preserves a clear straight route", () => {
+    const edges = [
+        { id: "bent", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
+        { id: "straight", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
+    ];
+    const routes = new Map([
+        ["bent", { sourcePoint: { x: 60, y: -80 }, bendPoints: [{ x: 60, y: 0 }, { x: 140, y: 0 }], targetPoint: { x: 140, y: -80 } }],
+        ["straight", { sourcePoint: { x: 0, y: 12 }, bendPoints: [{ x: 40, y: 12 }, { x: 40, y: 32 }, { x: 160, y: 32 }, { x: 160, y: 12 }], targetPoint: { x: 200, y: 12 } }],
+    ]);
+    enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
+    assert.deepEqual(routes.get("straight")!.bendPoints, []);
 });
 
 test("container-scoped ELK direction controls local layered layout", async () => {
@@ -356,7 +404,7 @@ test("layout settings reject invalid values, duplicates, and invalid scope", () 
     assert.throws(() => parseDsl("core:group g {\nedge-spacing 20\n}"), /Line 2: edge-spacing must be top-level/);
 });
 
-test("explicit edge spacing drives the global route lane pass", () => {
+test("explicit edge spacing does not add bends to preserve a preferred lane gap", () => {
     const config = parseDsl("edge-spacing 40\naws:lambda fn").layout;
     const edges = [
         { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
@@ -367,9 +415,8 @@ test("explicit edge spacing drives the global route lane pass", () => {
         ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 62 }, { x: 180, y: 62 }], targetPoint: { x: 180, y: 100 } }],
     ]);
     enforceGlobalEdgeSpacing([], edges, routes, config);
-    const firstY = routes.get("first")!.bendPoints[0]!.y;
-    const secondY = routes.get("second")!.bendPoints[0]!.y;
-    assert.ok(Math.abs(firstY - secondY) >= 40);
+    assert.equal(routes.get("first")!.bendPoints.length, 2);
+    assert.equal(routes.get("second")!.bendPoints.length, 2);
 });
 
 test("the bundled legacy DrawDSL file still parses, lays out, and renders", async () => {

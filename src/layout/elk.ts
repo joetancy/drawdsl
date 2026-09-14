@@ -65,7 +65,7 @@ function nodeSpacing(container: AstNode | undefined, children: PositionedNode[],
 }
 
 function layoutGrid(container: AstNode, children: PositionedNode[], config: LayoutConfig): LocalLayout {
-    const columnCount = Math.min(container.layout!.gridColumns!, children.length);
+    const columnCount = Math.min(container.layout?.gridColumns ?? Math.ceil(Math.sqrt(children.length)), children.length);
     const rowCount = Math.ceil(children.length / columnCount);
     const spacing = nodeSpacing(container, children, config);
     const columnWidths = Array.from({ length: columnCount }, () => 0);
@@ -102,7 +102,7 @@ function layoutGrid(container: AstNode, children: PositionedNode[], config: Layo
 
 async function layoutChildren(elk: ElkEngine, container: AstNode | undefined, children: PositionedNode[], ast: DocumentAst, nodesById: Map<string, AstNode>, config: LayoutConfig): Promise<LocalLayout> {
     if (!children.length) return { children, width: container ? dimensions(container).width : 0, height: container ? dimensions(container).height : 0 };
-    if (container?.layout?.gridColumns) return layoutGrid(container, children, config);
+    if (container && (container.layout?.gridColumns || container.layout?.direction === undefined)) return layoutGrid(container, children, config);
     const layoutOptions: Record<string, string> = {
         "elk.algorithm": "layered",
         "elk.padding": padding(container ? insets(container, config) : config.padding.root),
