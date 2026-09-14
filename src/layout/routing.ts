@@ -146,6 +146,16 @@ function boundaryConflicts(path: RoutePath, borders: LineSegment[], clearance: n
     return routeSegments([path]).flatMap((segment) => borders.filter((border) => tooClose(segment, border, clearance)).map((border) => ({ segment, border })));
 }
 
+function boundaryPenalty(path: RoutePath, borders: LineSegment[], clearance: number): number {
+    return boundaryConflicts(path, borders, clearance).reduce((sum, { segment, border }) => {
+        const horizontal = segment.horizontal;
+        const distance = Math.abs(horizontal ? segment.start.y - border.start.y : segment.start.x - border.start.x);
+        const overlap = horizontal ? overlapLength(segment.start.x, segment.end.x, border.start.x, border.end.x)
+            : overlapLength(segment.start.y, segment.end.y, border.start.y, border.end.y);
+        return sum + overlap * (clearance - distance) / (1 + distance);
+    }, 0);
+}
+
 function crossesObstacle(start: Point, end: Point, obstacle: Rect): boolean {
     if (start.x === end.x) {
         return start.x > obstacle.x && start.x < obstacle.x + obstacle.width
@@ -174,7 +184,8 @@ function paddedObstacles(obstacles: Rect[], clearance: number): Rect[] {
     }));
 }
 
-function sharesSegment(points: Point[], paths: RoutePath[], except: RoutePath): boolean {
+function sharedLength(points: Point[], paths: RoutePath[], except: RoutePath): number {
+    let length = 0;
     const candidateSegments: Array<{ start: Point; end: Point; horizontal: boolean }> = [];
     for (let index = 1; index < points.length; index += 1) {
         const start = points[index - 1]!;
@@ -190,10 +201,10 @@ function sharesSegment(points: Point[], paths: RoutePath[], except: RoutePath): 
             const firstEnd = segment.horizontal ? segment.end.x : segment.end.y;
             const secondStart = segment.horizontal ? other.start.x : other.start.y;
             const secondEnd = segment.horizontal ? other.end.x : other.end.y;
-            if (overlapLength(firstStart, firstEnd, secondStart, secondEnd) > 0) return true;
+            length += Math.max(0, overlapLength(firstStart, firstEnd, secondStart, secondEnd));
         }
     }
-    return false;
+    return length;
 }
 
 function validAttachment(point: Point, adjacent: Point, original: Point, node: FlatLayoutNode | undefined, fixed: boolean): boolean {
@@ -233,8 +244,8 @@ function straightenRoutes(nodes: FlatLayoutNode[], paths: RoutePath[], config: L
                         if (candidate.length < 2 || candidate.length >= path.points.length) continue;
                         if (!validAttachment(candidate[0]!, candidate[1]!, path.route.sourcePoint, byId.get(path.edge.source), !!path.edge.sourceSide)
                             || !validAttachment(candidate.at(-1)!, candidate.at(-2)!, path.route.targetPoint, byId.get(path.edge.target), !!path.edge.targetSide)) continue;
-                        if (boundaryConflicts({ ...path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
-                        if (!pathAvoidsObstacles(candidate, obstacles) || sharesSegment(candidate, paths, path)) continue;
+                        if (boundaryPenalty({ ...path, points: candidate }, borders, config.edgeEndpointClearance) > boundaryPenalty(path, borders, config.edgeEndpointClearance)) continue;
+                        if (!pathAvoidsObstacles(candidate, obstacles) || sharedLength(candidate, paths, path) > sharedLength(path.points, paths, path)) continue;
                         path.points = candidate;
                         improved = true;
                         break;
@@ -287,12 +298,11 @@ function clearContainerBorders(paths: RoutePath[], borders: LineSegment[], obsta
             let improved = false;
             for (const { segment, border } of conflicts) {
                 const distance = segment.horizontal ? border.start.y - segment.start.y : border.start.x - segment.start.x;
-                const offsets = [distance - config.edgeEndpointClearance, distance + config.edgeEndpointClearance].sort((a, b) => Math.abs(a) - Math.abs(b));
+                const offsets = [1, 0.5, 0.25].flatMap((scale) => [distance - config.edgeEndpointClearance * scale, distance + config.edgeEndpointClearance * scale].sort((a, b) => Math.abs(a) - Math.abs(b)));
                 for (const offset of offsets) {
                     const candidate = nudgePath(segment, offset, config.edgeEndpointClearance);
-                    if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(path.edge.id) ?? []) || sharesSegment(candidate, paths, path)) continue;
-                    const remaining = boundaryConflicts({ ...path, points: candidate }, borders, config.edgeEndpointClearance);
-                    if (remaining.length >= conflicts.length) continue;
+                    if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(path.edge.id) ?? []) || sharedLength(candidate, paths, path) > sharedLength(path.points, paths, path)) continue;
+                    if (boundaryPenalty({ ...path, points: candidate }, borders, config.edgeEndpointClearance) >= boundaryPenalty(path, borders, config.edgeEndpointClearance)) continue;
                     path.points = candidate;
                     conflicts = boundaryConflicts(path, borders, config.edgeEndpointClearance);
                     improved = true;
@@ -329,6 +339,7 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
         obstacles.get(path.edge.id)!.push(...nodes.filter((node) => !isContainer(node) && (node.id === path.edge.source || node.id === path.edge.target)));
     }
     clearContainerBorders(paths, borders, obstacles, config);
+    straightenRoutes(nodes, paths, config);
     const maxAdjustments = Math.max(paths.length * 8, 1);
     for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
         const baseline = conflictScore(paths, config.edgeSpacing);

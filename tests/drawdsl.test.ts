@@ -393,6 +393,39 @@ test("edges clear visible group borders without blocking perpendicular crossings
     }
 });
 
+test("border cleanup uses narrow lanes and ignores unchanged shared segments", () => {
+    const group = resolveSymbol({ namespace: "core", name: "group" });
+    const nodes = [100, 140].map((y, i) => ({ id: `group${i}`, symbol: group.ref, definition: group.definition, label: "", x: 100, y, width: 300, height: 300, declarationOrder: i }));
+    const edge = { id: "edge", source: "source", target: "target", operator: "-->" as const, declarationOrder: 0 };
+    // The source belongs to both nested groups, so their borders can be crossed.
+    const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
+    const source = { id: "source", symbol: icon.ref, definition: icon.definition, label: "", parentId: "group1", x: 260, y: 220, width: 80, height: 80, declarationOrder: 2 };
+    const other = { ...edge, id: "other", declarationOrder: 1 };
+    const routes = new Map([
+        [edge.id, { sourcePoint: { x: 300, y: 220 }, bendPoints: [{ x: 300, y: 100 }, { x: 0, y: 100 }], targetPoint: { x: 0, y: 0 } }],
+        [other.id, { sourcePoint: { x: 300, y: 220 }, bendPoints: [], targetPoint: { x: 300, y: 180 } }],
+    ]);
+    // An obstacle blocks the outer lane, leaving the 40-unit gap between borders.
+    const blocker = { ...source, id: "blocker", parentId: undefined, x: 100, y: -20, width: 100, height: 80 };
+    const innerBlocker = { ...blocker, id: "innerBlocker", y: 180 };
+    enforceGlobalEdgeSpacing([{ ...nodes[0]!, height: 400 }, { ...nodes[1]!, parentId: "group0" }, source, blocker, innerBlocker], [edge, other], routes, DEFAULT_LAYOUT_CONFIG);
+    assert.deepEqual(routes.get(edge.id)!.bendPoints, [{ x: 300, y: 120 }, { x: 0, y: 120 }]);
+});
+
+test("straightening runs after border clearance moves the final lane", () => {
+    const group = resolveSymbol({ namespace: "core", name: "group" });
+    const icon = resolveSymbol({ namespace: "aws", name: "users" });
+    const sourceGroup = { id: "sourceGroup", symbol: group.ref, definition: group.definition, label: "", x: 1160, y: 555, width: 560, height: 320, declarationOrder: 0 };
+    const targetGroup = { ...sourceGroup, id: "targetGroup", x: 600, y: 840, width: 400, height: 160 };
+    const source = { id: "source", symbol: icon.ref, definition: icon.definition, label: "", parentId: sourceGroup.id, x: 1560, y: 755, width: 80, height: 80, declarationOrder: 1 };
+    const target = { ...source, id: "target", parentId: targetGroup.id, x: 840, y: 880 };
+    const edge = { id: "edge", source: source.id, target: target.id, operator: "-->" as const, declarationOrder: 0 };
+    const routes = new Map([[edge.id, { sourcePoint: { x: 1576, y: 835 }, bendPoints: [{ x: 1576, y: 896 }], targetPoint: { x: 920, y: 896 } }]]);
+    enforceGlobalEdgeSpacing([sourceGroup, targetGroup, source, target], [edge], routes, DEFAULT_LAYOUT_CONFIG);
+    assert.deepEqual(routes.get(edge.id)!.bendPoints, [{ x: 1576, y: 915 }]);
+    assert.deepEqual(routes.get(edge.id)!.targetPoint, { x: 920, y: 915 });
+});
+
 test("container-scoped ELK direction controls local layered layout", async () => {
     const ast = parseDsl(`direction right
 core:group workers {
