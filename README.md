@@ -25,6 +25,14 @@ The example uses a multi-tier architecture with an AWS Region, nested VPCs, publ
 
 ## A tiny example
 
+Linear relationships can be written as a chain; each segment remains a distinct edge:
+
+```text
+internet --> gateway --> handler --> data
+```
+
+Declare the nodes as usual. Chain labels are not supported; use a separate binary edge when it needs a label.
+
 ```text
 direction right
 

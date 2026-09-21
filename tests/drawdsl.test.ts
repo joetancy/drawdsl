@@ -36,6 +36,21 @@ test("supports bidirectional solid and dashed connections", () => {
     assert.match(xml, /endArrow=block/);
 });
 
+test("chains existing edge operators into distinct binary edges", () => {
+    const ast = parseDsl(`aws:lambda a
+aws:sqs b
+aws:sns c
+aws:dynamodb d
+R:a --> b -.-> c -.- L:d`);
+    assert.deepEqual(ast.edges.map((edge) => [edge.source, edge.target, edge.operator, edge.sourceSide, edge.targetSide]), [
+        ["a", "b", "-->", "right", undefined],
+        ["b", "c", "-.->", undefined, undefined],
+        ["c", "d", "-.-", undefined, "left"],
+    ]);
+    assert.deepEqual(ast.edges.map((edge) => edge.declarationOrder), [4, 5, 6]);
+    assert.equal(parseDsl("aws:lambda a\naws:lambda b\na --> b : invokes").edges[0]?.label, "invokes");
+});
+
 test("edge endpoint selectors pin routes to a node side", async () => {
     const ast = parseDsl(`aws:lambda sender
 aws:sqs queue

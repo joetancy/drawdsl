@@ -37,6 +37,8 @@ source <--> target       # bidirectional, solid
 source <-.-> target      # bidirectional, dashed
 ```
 
+Linear relationships may be chained: `internet --> gateway --> handler`. Each segment is a separate edge. Use a separate binary edge when it needs a label.
+
 Pin an endpoint to a side with `T:`, `R:`, `B:`, or `L:`:
 
 ```text

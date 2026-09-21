@@ -3,6 +3,8 @@ import { layoutNumber, normalizeLayoutConfig, type ContainerLayoutOptions, type 
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
 const EDGE_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
+const CHAIN_OPERATOR_RE = /\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*/g;
+const ENDPOINT_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const DEFAULT_LAYOUT_RE = /^layout\s+elk$/;
 const GRID_COLUMNS_RE = /^grid-columns\s+(\S+)$/;
@@ -53,6 +55,20 @@ function nodeSide(value: string | undefined): NodeSide | undefined {
     if (!value) return undefined;
     const sides: Record<"T" | "R" | "B" | "L", NodeSide> = { T: "top", R: "right", B: "bottom", L: "left" };
     return sides[value.toUpperCase() as keyof typeof sides];
+}
+
+function parseEdgeChain(line: string): Array<{ id: string; side?: NodeSide; operator?: EdgeOperator }> | undefined {
+    const operators = [...line.matchAll(CHAIN_OPERATOR_RE)];
+    if (operators.length < 2) return undefined;
+    const parts = line.split(CHAIN_OPERATOR_RE).filter((_, index) => index % 2 === 0);
+    if (parts.length !== operators.length + 1) return undefined;
+    const endpoints = parts.map((part) => part.trim().match(ENDPOINT_RE));
+    if (endpoints.some((match) => !match)) return undefined;
+    return endpoints.map((match, index) => ({
+        id: match![2]!,
+        side: nodeSide(match![1]),
+        operator: index ? operators[index - 1]![1] as EdgeOperator : undefined,
+    }));
 }
 
 function parseSymbol(raw: string, lineNumber: number): { ref: SymbolRef; definition: ReturnType<typeof resolveSymbol>["definition"] } {
@@ -153,6 +169,24 @@ export function parseDsl(source: string): DocumentAst {
                 declarationOrder: order++,
                 line: lineNumber,
             });
+            continue;
+        }
+        const chain = parseEdgeChain(line);
+        if (chain) {
+            for (let position = 1; position < chain.length; position += 1) {
+                const source = chain[position - 1]!;
+                const target = chain[position]!;
+                edges.push({
+                    id: `edge:${edges.length + 1}:${source.id}:${target.id}`,
+                    source: source.id,
+                    target: target.id,
+                    sourceSide: source.side,
+                    targetSide: target.side,
+                    operator: target.operator!,
+                    declarationOrder: order++,
+                    line: lineNumber,
+                });
+            }
             continue;
         }
 
