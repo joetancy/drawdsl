@@ -551,7 +551,7 @@ test("the bundled legacy DrawDSL file still parses, lays out, and renders", asyn
     assert.equal(layout.edges.length > 10, true);
     assert.match(xml, /<mxfile/);
     assert.match(xml, /id="cloud"/);
-    assert.match(xml, /id="edge_1_internet_cdn"/);
+    assert.match(xml, /id="edge:1:internet:cdn"/);
 });
 
 test("inherited Object.prototype names are not symbols", () => {
@@ -564,4 +564,35 @@ test("inherited Object.prototype names are not symbols", () => {
     // Existing aliases and symbols still resolve.
     assert.equal(resolveSymbol({ namespace: "aws", name: "apigw" }).ref.name, "apigateway");
     assert.equal(resolveSymbol({ namespace: "core", name: "box" }).ref.name, "box");
+});
+
+test("edge IDs cannot collide with user node IDs", async () => {
+    const ast = parseDsl("core:box a\ncore:box b\ncore:box edge_1_a_b\na --> b");
+    const layout = await layoutDocument(ast);
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    const ids = [...xml.matchAll(/<mxCell id="([^"]+)"/g)].map((m) => m[1]!);
+    assert.equal(new Set(ids).size, ids.length);
+    assert.ok(ids.includes("edge_1_a_b"));
+    assert.ok(ids.some((id) => id!.startsWith("edge:")));
+    assert.match(xml, /source="a" target="b"/);
+});
+
+test("core:image requires a quoted absolute HTTP(S) URL", () => {
+    assert.throws(() => parseDsl("core:image x"), /core:image requires a quoted absolute HTTP/);
+    assert.throws(() => parseDsl('core:image x "javascript:alert(1)"'), /core:image requires a quoted absolute HTTP/);
+    assert.throws(() => parseDsl('core:image x "relative/path.png"'), /core:image requires a quoted absolute HTTP/);
+    assert.throws(() => parseDsl('core:image x "ftp://example.com/a.png"'), /core:image requires a quoted absolute HTTP/);
+    assert.throws(() => parseDsl('core:image x "https://example.com/a;shape=rectangle.png"'), /must not contain ";"/);
+    const ast = parseDsl('core:image reference "https://example.com/a.png?query=1&other=2#frag"');
+    assert.equal(ast.nodes[0]?.label, "https://example.com/a.png?query=1&other=2#frag");
+});
+
+test("labels display literally and style URLs cannot inject keys", async () => {
+    const ast = parseDsl('core:box a "<b>literal</b> & text"\ncore:box b "plain"\na --> b : "<i>edge</i> & more"');
+    const layout = await layoutDocument(ast);
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    // Double-encoded so draw.io with html=1 shows literal text.
+    assert.match(xml, /&amp;lt;b&amp;gt;literal&amp;lt;\/b&amp;gt; &amp;amp; text/);
+    assert.match(xml, /&amp;lt;i&amp;gt;edge&amp;lt;\/i&amp;gt; &amp;amp; more/);
+    assert.doesNotMatch(xml, /value="[^"]*<b>/);
 });

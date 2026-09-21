@@ -3,11 +3,17 @@ import { isRenderable, type FlatLayoutNode, type NodeSide, type Point, type Rout
 function xmlEscape(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
 }
+
+// Labels render with html=1, so escape HTML first so XML-decoded text displays literally.
+function labelForXml(value: string): string {
+    return xmlEscape(value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
+}
 function styleString(tokens: readonly string[]): string { return `${tokens.join(";")};`; }
 
 function nodeStyle(node: FlatLayoutNode): string {
     const drawio = node.definition.drawio;
     if (node.symbol.namespace === "core" && node.symbol.name === "image") {
+        if (node.label.includes(";")) throw new Error(`image URL must not contain ";": ${node.id}`);
         return styleString(["shape=image", "imageAspect=1", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
     }
     if (node.definition.role === "container") {
@@ -64,11 +70,11 @@ export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): stri
         const parentNode = parentFor(node); const parent = parentNode?.id ?? "1";
         const x = parentNode ? node.x - parentNode.x : node.x; const y = parentNode ? node.y - parentNode.y : node.y;
         const value = node.symbol.namespace === "core" && node.symbol.name === "image" ? "" : node.label;
-        lines.push(`        <mxCell id="${xmlEscape(node.id)}" value="${xmlEscape(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
+        lines.push(`        <mxCell id="${xmlEscape(node.id)}" value="${labelForXml(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
         lines.push(`          <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "        </mxCell>");
     }
     for (const edge of edges) {
-        lines.push(`        <mxCell id="${xmlEscape(edge.id)}" value="${xmlEscape(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '          <mxGeometry relative="1" as="geometry">');
+        lines.push(`        <mxCell id="${xmlEscape(edge.id)}" value="${labelForXml(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '          <mxGeometry relative="1" as="geometry">');
         if (edge.points.length) {
             lines.push('            <Array as="points">');
             for (const point of edge.points) lines.push(`              <mxPoint x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}"/>`);

@@ -85,7 +85,7 @@ Suggested first delivery: P01–P05 plus regression coverage for their affected 
 
 ## P02 — Make draw.io output structurally and textually correct
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** This valid DSL produces two `<mxCell id="edge_1_a_b">` elements:
 

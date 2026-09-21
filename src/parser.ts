@@ -133,7 +133,7 @@ export function parseDsl(source: string): DocumentAst {
         const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
             edges.push({
-                id: `edge_${edges.length + 1}_${edgeMatch[2]}_${edgeMatch[5]}`,
+                id: `edge:${edges.length + 1}:${edgeMatch[2]}:${edgeMatch[5]}`,
                 source: edgeMatch[2]!,
                 target: edgeMatch[5]!,
                 sourceSide: nodeSide(edgeMatch[1]),
@@ -157,6 +157,18 @@ export function parseDsl(source: string): DocumentAst {
         const explicitId = declarationMatch[3];
         const quotedLabel = declarationMatch[4];
         const opensBlock = Boolean(declarationMatch[5]);
+        const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
+        if (symbol.ref.namespace === "core" && symbol.ref.name === "image") {
+            if (quotedLabel === undefined) throw new Error(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`);
+            let url: URL;
+            try {
+                url = new URL(label);
+            } catch {
+                throw new Error(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`);
+            }
+            if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`);
+            if (label.includes(";")) throw new Error(`Line ${lineNumber}: core:image URL must not contain ";"`);
+        }
         const container = symbol.definition.role === "container";
         if (opensBlock && !container) throw new Error(`Line ${lineNumber}: resource property blocks are not implemented`);
         if (!opensBlock && container) throw new Error(`Line ${lineNumber}: container ${symbol.ref.name} must open a block with {`);
@@ -169,7 +181,6 @@ export function parseDsl(source: string): DocumentAst {
                 id = `__${symbol.ref.namespace}_${symbol.ref.name}_${anonymousNodeCount}`;
             } while (ids.has(id));
         }
-        const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (ids.has(id)) throw new Error(`Line ${lineNumber}: duplicate node ID ${id}`);
         ids.add(id);
         const parent = stack.at(-1);

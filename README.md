@@ -81,7 +81,7 @@ Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted
 
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
 
-Use `core:image` with a quoted HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; its displayed label is intentionally empty.
+Use `core:image` with a quoted absolute HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; its displayed label is intentionally empty. URLs containing `;` are rejected because `;` delimits draw.io styles.
 
 ```text
 core:image architecture_reference "https://example.com/architecture.png"
