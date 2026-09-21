@@ -185,6 +185,65 @@ test("narrow viewport keeps essential controls reachable", async ({ page }) => {
     }
 });
 
+test("repo link points at the project", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await expect(page.locator("#repo-link")).toHaveAttribute("href", "https://github.com/joetancy/drawdsl");
+});
+
+test("containers fold and unfold from the gutter", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await expect(page.locator("#fold-gutter [data-fold-start]")).toHaveCount(2);
+    await page.locator('#fold-gutter [data-fold-start="3"]').click();
+    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await expect(page.locator("#source")).toHaveValue(/aws:cloud cloud/);
+    // Compilation still sees the folded lines.
+    await expect(page.locator("#copy-xml")).toBeEnabled();
+    await page.locator('#fold-gutter [data-fold-start="3"]').click();
+    await expect(page.locator("#source")).toHaveValue(/Request handler/);
+});
+
+test("edits outside a fold keep it folded", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await page.locator('#fold-gutter [data-fold-start="3"]').click();
+    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await page.locator("#source").click();
+    await page.keyboard.press("Home");
+    await page.keyboard.type("# folded survives\n");
+    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
+});
+
+test("fold-all toggle and error navigation with folds", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await page.click("#fold-toggle");
+    await expect(page.locator("#fold-toggle")).toContainText("Unfold all");
+    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await page.click("#fold-toggle");
+    await expect(page.locator("#fold-toggle")).toContainText("Fold all");
+    await expect(page.locator("#source")).toHaveValue(/Request handler/);
+    // Error on a visible line still navigates while another region stays folded.
+    await page.locator('#fold-gutter [data-fold-start="3"]').click();
+    await page.locator("#source").click();
+    await page.keyboard.press("Home");
+    await page.keyboard.type("bogus ");
+    await expect(page.locator("#goto-error")).toBeVisible({ timeout: 15_000 });
+    await page.click("#goto-error");
+    await expect(page.locator("#source")).toBeFocused();
+    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+});
+
 test("dashed operators highlight the same as solid ones", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);

@@ -7,6 +7,16 @@ import { formatDsl } from "./formatter.js";
 import { renderDrawio } from "./render/drawio.js";
 import { buildShareHash, resolveShareDsl } from "./share.js";
 import { DslError } from "./model.js";
+import {
+    applyFolds,
+    computeFoldRegions,
+    lineColToOffset,
+    mergeDisplayEdit,
+    offsetToLineCol,
+    remapFolds,
+    type FoldMaps,
+    type FoldRegion,
+} from "./fold.js";
 
 declare global {
     interface Window {
@@ -31,6 +41,9 @@ handler --> data
 `;
 
 const source = document.querySelector<HTMLTextAreaElement>("#source")!;
+const editorInput = document.querySelector<HTMLDivElement>(".editor-input")!;
+const foldGutter = document.querySelector<HTMLDivElement>("#fold-gutter")!;
+const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const lineNumbers = document.querySelector<HTMLPreElement>("#line-numbers")!;
 const syntaxHighlight = document.querySelector<HTMLPreElement>("#syntax-highlight")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
@@ -72,9 +85,10 @@ function setErrorLine(line?: number): void {
 
 function focusErrorLine(): void {
     if (errorLine === undefined || showingXml) return;
+    ensureLineVisible(errorLine - 1);
+    const displayed = foldMaps.fullToDisplay[errorLine - 1] ?? 0;
     const lines = source.value.split("\n");
-    let offset = 0;
-    for (let i = 0; i < errorLine - 1 && i < lines.length; i += 1) offset += lines[i]!.length + 1;
+    const offset = lineColToOffset(lines, displayed, 0);
     source.focus();
     source.setSelectionRange(offset, offset);
     updateEditor();
@@ -84,6 +98,95 @@ function reportError(error: unknown, stalePreview: boolean): void {
     const message = error instanceof Error ? error.message : String(error);
     status.textContent = stalePreview && lastGoodXml ? `${message} (showing last successful preview)` : message;
     setErrorLine(error instanceof DslError ? error.line : undefined);
+}
+
+let editorFull = "";
+let foldRegions: FoldRegion[] = [];
+let foldedStarts = new Set<number>();
+let foldMaps: FoldMaps = { displayToFull: [], fullToDisplay: [] };
+let lastDisplay = "";
+
+// The textarea shows the folded view; editorFull is the complete diagram source.
+function displaySelectionToFull(start: number, end: number): [number, number] {
+    const displayLines = source.value.split("\n");
+    const fullLines = editorFull.split("\n");
+    const toFull = (offset: number): number => {
+        const { line, col } = offsetToLineCol(displayLines, offset);
+        return lineColToOffset(fullLines, foldMaps.displayToFull[line] ?? 0, col);
+    };
+    return [toFull(start), toFull(end)];
+}
+
+function fullSelectionToDisplay(start: number, end: number): [number, number] {
+    const fullLines = editorFull.split("\n");
+    const displayLines = source.value.split("\n");
+    const toDisplay = (offset: number): number => {
+        const { line, col } = offsetToLineCol(fullLines, offset);
+        const visible = foldMaps.fullToDisplay[line];
+        if (visible !== undefined) return lineColToOffset(displayLines, visible, col);
+        const region = foldRegions.find((candidate) => candidate.start < line && line <= candidate.end && foldedStarts.has(candidate.start));
+        const opener = region ? foldMaps.fullToDisplay[region.start] ?? 0 : 0;
+        return lineColToOffset(displayLines, opener, displayLines[opener]?.length ?? 0);
+    };
+    return [toDisplay(start), toDisplay(end)];
+}
+
+function renderFoldedView(selFull?: [number, number]): void {
+    const keep = selFull ?? displaySelectionToFull(source.selectionStart, source.selectionEnd);
+    const { text, maps } = applyFolds(editorFull, foldRegions, foldedStarts);
+    foldMaps = maps;
+    lastDisplay = text;
+    if (source.value !== text) source.value = text;
+    const [start, end] = fullSelectionToDisplay(keep[0], keep[1]);
+    source.setSelectionRange(start, end);
+}
+
+function syncEditorFromDisplay(): void {
+    const newDisplay = source.value;
+    if (newDisplay === lastDisplay) return;
+    const merge = mergeDisplayEdit(editorFull, foldMaps.displayToFull, lastDisplay, newDisplay);
+    editorFull = merge.full;
+    const oldRegions = foldRegions;
+    foldRegions = computeFoldRegions(editorFull);
+    foldedStarts = remapFolds(oldRegions, foldedStarts, merge.fullStart, merge.fullEnd, merge.insertedCount, foldRegions);
+    const newDisplayLines = newDisplay.split("\n");
+    const fullLines = editorFull.split("\n");
+    const toFull = (offset: number): number => {
+        const { line, col } = offsetToLineCol(newDisplayLines, offset);
+        return lineColToOffset(fullLines, merge.newDisplayToFull[line] ?? 0, col);
+    };
+    renderFoldedView([toFull(source.selectionStart), toFull(source.selectionEnd)]);
+}
+
+function getEditorFull(): string {
+    if (!showingXml && source.value !== lastDisplay) syncEditorFromDisplay();
+    return editorFull;
+}
+
+function setEditorText(full: string): void {
+    editorFull = full;
+    foldRegions = computeFoldRegions(full);
+    foldedStarts = new Set<number>();
+    renderFoldedView([0, 0]);
+}
+
+function toggleFold(fullStart: number): void {
+    if (foldedStarts.has(fullStart)) foldedStarts.delete(fullStart);
+    else foldedStarts.add(fullStart);
+    renderFoldedView();
+    updateEditor();
+    source.focus();
+}
+
+function ensureLineVisible(fullLine: number): void {
+    let changed = false;
+    for (const region of foldRegions) {
+        if (region.start < fullLine && fullLine <= region.end && foldedStarts.delete(region.start)) changed = true;
+    }
+    if (changed) {
+        renderFoldedView();
+        updateEditor();
+    }
 }
 const routerReady = initRouter(new URL("../node_modules/libavoid-js/dist/libavoid.wasm", import.meta.url).href);
 routerReady.catch(() => {});
@@ -133,7 +236,7 @@ function readSavedState(): { diagrams: SavedDiagram[]; failed: boolean } {
 }
 
 function currentSource(): string {
-    return showingXml ? dslSource : source.value;
+    return showingXml ? dslSource : getEditorFull();
 }
 
 function isDirtyForLoad(): boolean {
@@ -183,8 +286,7 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     savedSnapshot = diagram.source;
     showingXml = false;
     dslSource = diagram.source;
-    source.value = diagram.source;
-    setEditorMode();
+    setEditorText(diagram.source);
     source.setSelectionRange(0, 0);
     source.scrollTop = 0;
     source.scrollLeft = 0;
@@ -296,14 +398,31 @@ function syncEditorScroll(): void {
     syntaxHighlight.scrollTop = source.scrollTop;
     syntaxHighlight.scrollLeft = source.scrollLeft;
     lineNumbers.scrollTop = source.scrollTop;
+    foldGutter.scrollTop = source.scrollTop;
 }
 
 function updateEditor(): void {
     const lines = source.value.split("\n");
     const activeLine = source.value.slice(0, source.selectionStart).split("\n").length - 1;
+    const regions = showingXml ? [] : foldRegions;
+    const regionByStart = new Map(regions.map((region) => [region.start, region]));
     const results = lines.map((line) => showingXml ? { html: escapeHtml(line) || " ", kind: "plain" } : highlightLine(line));
-    syntaxHighlight.innerHTML = results.map((result, index) => `<span class="editor-line${index === activeLine ? " active" : ""}">${result.html}</span>`).join("");
+    syntaxHighlight.innerHTML = results.map((result, index) => {
+        const fullLine = showingXml ? -1 : (foldMaps.displayToFull[index] ?? -1);
+        const folded = fullLine >= 0 && foldedStarts.has(fullLine);
+        return `<span class="editor-line${index === activeLine ? " active" : ""}${folded ? " folded" : ""}">${result.html}</span>`;
+    }).join("");
     lineNumbers.innerHTML = results.map((result, index) => `<span class="editor-line token-${result.kind}${index === activeLine ? " active" : ""}">${index + 1}</span>`).join("");
+    foldGutter.innerHTML = lines.map((_, index) => {
+        const fullLine = showingXml ? -1 : (foldMaps.displayToFull[index] ?? -1);
+        const region = fullLine >= 0 ? regionByStart.get(fullLine) : undefined;
+        if (!region) return "<span class=\"editor-line\"></span>";
+        const folded = foldedStarts.has(fullLine);
+        const label = folded ? `Unfold lines ${region.start + 1} to ${region.end + 1}` : `Fold lines ${region.start + 1} to ${region.end + 1}`;
+        return `<span class="editor-line"><button class="fold-toggle-btn" type="button" data-fold-start="${fullLine}" aria-expanded="${String(!folded)}" aria-label="${label}">${folded ? "▸" : "▾"}</button></span>`;
+    }).join("");
+    foldToggle.disabled = showingXml || !regions.length;
+    foldToggle.textContent = !regions.length || foldedStarts.size < regions.length ? "Fold all" : "Unfold all";
     syncEditorScroll();
 }
 
@@ -331,7 +450,7 @@ function showPreview(xml: string): void {
 
 async function render(): Promise<void> {
     const seen = sourceRevision;
-    const src = showingXml ? dslSource : source.value;
+    const src = showingXml ? dslSource : getEditorFull();
     try {
         const ast = parseDsl(src);
         await routerReady;
@@ -348,6 +467,7 @@ async function render(): Promise<void> {
         xmlToggle.disabled = false;
         if (showingXml) {
             source.value = xml;
+            lastDisplay = xml;
             updateEditor();
         }
         try {
@@ -382,9 +502,9 @@ function showPreviewFallback(): void {
 
 const initialHash = location.hash.slice(1);
 const initialLegacy = new URLSearchParams(initialHash).get("dsl");
-source.value = initialLegacy ?? starter;
-dslSource = source.value;
-savedSnapshot = source.value;
+setEditorText(initialLegacy ?? starter);
+dslSource = editorFull;
+savedSnapshot = editorFull;
 skillSource.textContent = skillText;
 setEditorMode();
 updateEditor();
@@ -505,11 +625,11 @@ copySkill.addEventListener("click", async () => {
 });
 formatDslButton.addEventListener("click", () => {
     try {
-        const formatted = formatDsl(showingXml ? dslSource : source.value);
+        const formatted = formatDsl(showingXml ? dslSource : getEditorFull());
         parseDsl(formatted);
         showingXml = false;
         dslSource = formatted;
-        source.value = formatted;
+        setEditorText(formatted);
         scheduleShareUrl();
         updateEditor();
         setEditorMode();
@@ -526,17 +646,19 @@ gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
     source.setAttribute("aria-label", showingXml ? "draw.io XML output (read-only)" : "DrawDSL source");
     source.readOnly = showingXml;
+    editorInput.classList.toggle("no-fold", showingXml);
 }
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
     showingXml = !showingXml;
     if (showingXml) {
-        dslSource = source.value;
+        dslSource = getEditorFull();
         source.value = latestXml;
+        lastDisplay = latestXml;
         updateEditor();
         xmlToggle.textContent = "📝 Show DSL";
     } else {
-        source.value = dslSource;
+        setEditorText(dslSource);
         updateEditor();
         xmlToggle.textContent = "🧾 Show draw.io XML";
     }
@@ -554,14 +676,11 @@ source.addEventListener("keydown", (event) => {
     const start = source.selectionStart;
     const end = source.selectionEnd;
     source.setRangeText("    ", start, end, "end");
-    dslSource = source.value;
-    updateEditor();
     source.dispatchEvent(new Event("input"));
 });
 copyXml.addEventListener("click", async () => {
     if (!latestXml || copyXml.disabled) return;
-    const currentSrc = showingXml ? dslSource : source.value;
-    if (currentSrc !== lastGoodSource) return;
+    if (currentSource() !== lastGoodSource) return;
     try {
         await navigator.clipboard.writeText(latestXml);
         copyXml.textContent = "✅ Copied!";
@@ -579,7 +698,7 @@ downloadDrawio.addEventListener("click", () => {
     downloadFile(downloadFilename("drawio"), latestXml, "application/xml");
 });
 copyShareLink.addEventListener("click", async () => {
-    const snapshot = showingXml ? dslSource : source.value;
+    const snapshot = currentSource();
     const revision = shareRevision;
     try {
         await syncShareUrl(snapshot, revision);
@@ -600,12 +719,27 @@ themeToggle.addEventListener("click", () => {
 });
 source.addEventListener("input", () => {
     if (showingXml) return;
-    dslSource = source.value;
+    syncEditorFromDisplay();
+    dslSource = editorFull;
     markSourceChanged();
     scheduleShareUrl();
     updateEditor();
     clearTimeout(debounce);
     debounce = setTimeout(() => void render(), 300);
+});
+foldGutter.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest("[data-fold-start]");
+    if (!button) return;
+    toggleFold(Number((button as HTMLElement).dataset.foldStart));
+});
+foldToggle.addEventListener("click", () => {
+    if (showingXml || !foldRegions.length) return;
+    getEditorFull();
+    if (foldedStarts.size < foldRegions.length) foldRegions.forEach((region) => foldedStarts.add(region.start));
+    else foldedStarts.clear();
+    renderFoldedView();
+    updateEditor();
+    source.focus();
 });
 source.addEventListener("scroll", syncEditorScroll);
 source.addEventListener("focus", updateEditor);
@@ -620,7 +754,7 @@ void (async () => {
     const { dsl, error } = await resolveShareDsl(initialHash);
     if (dsl !== null) {
         if (shareRevision === initialRevision && sourceRevision === 0) {
-            source.value = dsl;
+            setEditorText(dsl);
             dslSource = dsl;
             savedSnapshot = dsl;
             markSourceChanged();

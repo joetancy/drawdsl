@@ -14,6 +14,7 @@
         <div class="header-actions">
             <button id="guide-toggle" type="button">📖 DSL guide</button>
             <button id="skill-toggle" type="button">SKILL.md</button>
+            <a id="repo-link" href="https://github.com/joetancy/drawdsl" target="_blank" rel="noreferrer">GitHub</a>
             <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
         </div>
     </header>
@@ -32,6 +33,7 @@
             <div class="editor-toolbar">
                 <label for="source">DSL</label>
                 <div class="editor-actions">
+                    <button id="fold-toggle" type="button">Fold all</button>
                     <button id="format-dsl" type="button">✨ Format DrawDSL</button>
                     <button id="copy-share-link" type="button">🔗 Copy share link</button>
                     <button id="xml-toggle" type="button" disabled>🧾 Show draw.io XML</button>
@@ -41,6 +43,7 @@
                 </div>
             </div>
             <div class="editor-input">
+                <div id="fold-gutter" aria-label="Fold containers"></div>
                 <pre id="line-numbers" aria-hidden="true"><span>1</span></pre>
                 <div class="editor-code">
                     <pre id="syntax-highlight" aria-hidden="true"></pre>
@@ -104,7 +107,7 @@ aws:cloud cloud "AWS Cloud" {
     }
 }</code></pre>
             <p>Use <code>#</code> for comments. Labels support <code>\n</code>, <code>\"</code>, and <code>\\</code> escapes. Layout directives include <code>direction</code>, <code>node-spacing</code>, <code>layer-spacing</code>, <code>edge-spacing</code>, <code>padding</code>, and container-only <code>grid-columns</code>.</p>
-            <p>Keyboard: <code>Tab</code> indents, <code>Shift+Tab</code> leaves the editor, and <code>Esc</code> moves focus to the toolbar.</p>
+            <p>Keyboard: <code>Tab</code> indents, <code>Shift+Tab</code> leaves the editor, and <code>Esc</code> moves focus to the toolbar. Containers can be collapsed with the chevrons in the fold gutter (or <strong>Fold all</strong>); folded lines stay part of the diagram and edits elsewhere keep folds intact.</p>
             <h3>Grid layout</h3>
             <p>Use <code>core:layout</code> for an invisible structural container. Set <code>grid-columns</code> to arrange its direct children in declaration order; nested layout containers can define separate columns without adding a visible group.</p>
             <pre><code>core:layout grid {
