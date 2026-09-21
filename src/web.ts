@@ -6,6 +6,7 @@ import { parseDsl } from "./parser.js";
 import { formatDsl } from "./formatter.js";
 import { renderDrawio } from "./render/drawio.js";
 import { buildShareHash, resolveShareDsl } from "./share.js";
+import { DslError } from "./model.js";
 
 declare global {
     interface Window {
@@ -57,6 +58,30 @@ const copyShareLink = document.querySelector<HTMLButtonElement>("#copy-share-lin
 const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
 const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
+const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
+let errorLine: number | undefined;
+
+function setErrorLine(line?: number): void {
+    errorLine = line;
+    gotoError.hidden = line === undefined;
+    if (line !== undefined) gotoError.textContent = `Go to line ${line}`;
+}
+
+function focusErrorLine(): void {
+    if (errorLine === undefined || showingXml) return;
+    const lines = source.value.split("\n");
+    let offset = 0;
+    for (let i = 0; i < errorLine - 1 && i < lines.length; i += 1) offset += lines[i]!.length + 1;
+    source.focus();
+    source.setSelectionRange(offset, offset);
+    updateEditor();
+}
+
+function reportError(error: unknown, stalePreview: boolean): void {
+    const message = error instanceof Error ? error.message : String(error);
+    status.textContent = stalePreview && lastGoodXml ? `${message} (showing last successful preview)` : message;
+    setErrorLine(error instanceof DslError ? error.line : undefined);
+}
 const routerReady = initRouter(new URL("../node_modules/libavoid-js/dist/libavoid.wasm", import.meta.url).href);
 routerReady.catch(() => {});
 const viewerReady = new Promise<void>((resolve, reject) => {
@@ -298,12 +323,12 @@ async function render(): Promise<void> {
 
         showPreview(xml);
         status.textContent = "";
+        setErrorLine(undefined);
     } catch (error) {
         if (seen !== sourceRevision) return;
         copyXml.disabled = true;
         xmlToggle.disabled = !lastGoodXml;
-        const message = error instanceof Error ? error.message : String(error);
-        status.textContent = lastGoodXml ? `${message} (showing last successful preview)` : message;
+        reportError(error, true);
     }
 }
 
@@ -404,12 +429,14 @@ formatDslButton.addEventListener("click", () => {
         source.readOnly = false;
         xmlToggle.textContent = "🧾 Show draw.io XML";
         status.textContent = "Formatted successfully";
+        setErrorLine(undefined);
         markSourceChanged();
         void render();
     } catch (error) {
-        status.textContent = error instanceof Error ? error.message : String(error);
+        reportError(error, false);
     }
 });
+gotoError.addEventListener("click", focusErrorLine);
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
     showingXml = !showingXml;

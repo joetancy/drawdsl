@@ -512,6 +512,49 @@ test("layout settings reject invalid values, duplicates, and invalid scope", () 
     assert.throws(() => parseDsl("core:group g {\nedge-spacing 20\n}"), /Line 2: edge-spacing must be top-level/);
 });
 
+test("diagnostics carry source lines for symbols, endpoints, and containers", async () => {
+    const { DslError } = await import("../src/model.js");
+    const lineOf = (fn: () => void): number | undefined => {
+        try {
+            fn();
+        } catch (error) {
+            assert.ok(error instanceof DslError);
+            assert.match((error as Error).message, /Line \d+:/);
+            return (error as { line?: number }).line;
+        }
+        assert.fail("expected to throw");
+    };
+    assert.equal(lineOf(() => parseDsl("aws:lambda ok\ncore:nosuch thing")), 2);
+    assert.equal(lineOf(() => parseDsl("aws:lambda a\na --> missing")), 2);
+    assert.equal(lineOf(() => parseDsl("aws:lambda a\nmissing --> a")), 2);
+    assert.equal(lineOf(() => parseDsl('core:group g "G" {')), 1);
+    assert.equal(lineOf(() => parseDsl("direction right\ndirection down")), 2);
+    assert.equal(lineOf(() => parseDsl("core:group g {\n    grid-columns 0\n    aws:lambda a\n}")), 2);
+    assert.equal(lineOf(() => parseDsl("core:group g {\n    grid-columns 999999999999999999999\n    aws:lambda a\n}")), 2);
+    assert.equal(lineOf(() => parseDsl("core:group g {\n    grid-columns 1.5\n    aws:lambda a\n}")), 2);
+    assert.equal(parseDsl("core:group g {\n    grid-columns 10000\n    aws:lambda a\n}").nodes[0]?.layout?.gridColumns, 10000);
+    assert.throws(() => parseDsl("core:group g {\n    grid-columns 2\n    grid-columns 3\n    aws:lambda a\n}"), /already set/);
+});
+
+test("formatter ignores braces inside edge labels", () => {
+    const source = "aws:lambda first\naws:lambda second\nfirst --> second : brace {\naws:lambda third\n";
+    const formatted = formatDsl(source);
+    assert.match(formatted, /first --> second : brace \{\naws:lambda third\n/);
+    assert.equal(formatDsl(formatted), formatted);
+    assert.deepEqual(parseDsl(formatted).edges.map((e) => e.label), parseDsl(source).edges.map((e) => e.label));
+});
+
+test("formatter preserves nested blocks, comments, quotes, multiline, and CRLF", () => {
+    const source = 'direction right\r\n\r\n# top comment\naws:cloud cloud "Cloud \\"quoted\\"" {\r\n    aws:lambda fn "line1\\nline2" # trailing\n    core:text note "multi\nline label"\n}\nfn --> fn : work\n';
+    const formatted = formatDsl(source);
+    assert.equal(formatDsl(formatted), formatted);
+    const before = parseDsl(source);
+    const after = parseDsl(formatted);
+    const flat = (nodes: typeof before.nodes): string[] => nodes.flatMap((n) => [n.id, ...flat(n.children)]);
+    assert.deepEqual(flat(after.nodes), flat(before.nodes));
+    assert.deepEqual(after.edges.map((e) => [e.source, e.target, e.label]), before.edges.map((e) => [e.source, e.target, e.label]));
+});
+
 test("explicit edge spacing does not add bends to preserve a preferred lane gap", () => {
     const config = parseDsl("edge-spacing 40\naws:lambda fn").layout;
     const edges = [

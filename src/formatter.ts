@@ -1,4 +1,4 @@
-import { hasUnclosedQuote, stripComment } from "./parser.js";
+import { hasUnclosedQuote, isBlockOpener, stripComment } from "./parser.js";
 
 export function formatDsl(source: string): string {
     const output: string[] = [];
@@ -23,7 +23,7 @@ export function formatDsl(source: string): string {
         output.push(`${"    ".repeat(indent)}${firstLine}`);
         output.push(...statementLines.slice(1));
         previousWasBlank = false;
-        if (code.endsWith("{")) indent += 1;
+        if (isBlockOpener(code)) indent += 1;
     }
     while (output.at(-1) === "") output.pop();
     return `${output.join("\n")}\n`;

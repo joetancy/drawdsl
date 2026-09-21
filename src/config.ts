@@ -1,4 +1,5 @@
 import type { Direction } from "./model.js";
+import { DslError } from "./model.js";
 
 export type Insets = { top: number; right: number; bottom: number; left: number };
 
@@ -53,18 +54,18 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
 
 const allSides = (value: number): Insets => ({ top: value, right: value, bottom: value, left: value });
 
-function validateLayoutNumber(name: string, value: number, allowZero: boolean, prefix = ""): number {
+function validateLayoutNumber(name: string, value: number, allowZero: boolean, prefix = "", line?: number): number {
     const minimum = allowZero ? 0 : 1;
     if (!Number.isSafeInteger(value) || value < minimum || value > 10_000) {
-        throw new Error(`${prefix}${name} must be an integer from ${minimum} to 10000`);
+        throw new DslError(`${prefix}${name} must be an integer from ${minimum} to 10000`, line);
     }
     return value;
 }
 
 export function layoutNumber(name: string, raw: string | undefined, lineNumber: number, allowZero = false): number {
     const value = Number(raw);
-    if (!raw || !/^\d+$/.test(raw)) return validateLayoutNumber(name, Number.NaN, allowZero, `Line ${lineNumber}: `);
-    return validateLayoutNumber(name, value, allowZero, `Line ${lineNumber}: `);
+    if (!raw || !/^\d+$/.test(raw)) return validateLayoutNumber(name, Number.NaN, allowZero, `Line ${lineNumber}: `, lineNumber);
+    return validateLayoutNumber(name, value, allowZero, `Line ${lineNumber}: `, lineNumber);
 }
 
 export function normalizeLayoutConfig(parsed: ParsedLayoutConfig): LayoutConfig {

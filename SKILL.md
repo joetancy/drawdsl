@@ -57,7 +57,7 @@ AWS aliases such as `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`,
 
 ## Layout
 
-Document-level directives include `direction right|left|down|up`, `node-spacing N`, `layer-spacing N`, `edge-spacing N`, and `padding N`.
+Document-level directives include `direction right|left|down|up`, `node-spacing N`, `layer-spacing N`, `edge-spacing N`, and `padding N`. Spacing directives accept integers from 1 to 10000 (`padding` allows 0); each directive may be set only once per document or container. Labels support `\n`, `\"`, and `\\`, including multiline quoted labels.
 
 Use `core:layout` plus `grid-columns N` to place direct children in declaration order, left to right and then top to bottom. Nested layout containers can create columns without visible groups. Grid children may be connected, but layout containers cannot be edge endpoints:
 

@@ -5,6 +5,15 @@ export type NodeSide = "top" | "right" | "bottom" | "left";
 export type EdgeOperator = "-->" | "-.->" | "---" | "-.-" | "<-->" | "<-.->";
 export type SymbolRole = "resource" | "container" | "annotation";
 
+export class DslError extends Error {
+    line?: number;
+    constructor(message: string, line?: number) {
+        super(message);
+        this.name = "DslError";
+        if (line !== undefined) this.line = line;
+    }
+}
+
 export type SymbolRef = {
     namespace: string;
     name: string;
@@ -45,6 +54,7 @@ export type AstNode = {
     children: AstNode[];
     layout?: ContainerLayoutOptions;
     declarationOrder: number;
+    line?: number;
 };
 
 export type AstEdge = {
@@ -56,6 +66,7 @@ export type AstEdge = {
     operator: EdgeOperator;
     label?: string;
     declarationOrder: number;
+    line?: number;
 };
 
 export type DocumentAst = {

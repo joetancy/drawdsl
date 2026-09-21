@@ -172,7 +172,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P06 — Improve diagnostics and formatter correctness
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** Unknown symbols, unknown endpoints, and unclosed containers often lack a source line. Duplicate document `direction` silently uses the last value while duplicate container directions fail. `grid-columns 999999999999999999999` is accepted despite not being a safe integer. Formatting a valid unquoted edge label ending in `{` indents subsequent statements because `formatDsl()` treats any `code.endsWith("{")` as a block opener.
 

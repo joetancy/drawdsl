@@ -144,7 +144,9 @@ core:layout application_grid {
 }
 ```
 
-`direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `edge-spacing` is document-only. Partial configuration is supported.
+`direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `grid-columns` accepts 1 to 10000 and must be inside a container with at least one child. `edge-spacing` is document-only. Each directive may be set only once per document or container; duplicates fail. Partial configuration is supported.
+
+Labels support `\n`, `\"`, and `\\` escapes, including literal multiline quoted labels; CRLF line endings parse like LF. Errors report the offending source line in both the CLI and the playground, where a Go-to-line button focuses the editor.
 
 When omitted, root nodes use 240px spacing, resources inside containers use 80px, container-only siblings use 160px, layers use 240px, and routed edge lanes use 20px. Root padding is 40px; visible containers use 40px vertically and 80px horizontally; invisible `core:layout` containers have no padding. Explicit document-level `node-spacing` or `padding` replaces these tiered defaults.
 
