@@ -117,7 +117,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P03 — Separate CI validation from deployment
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** `.github/workflows/pages.yml` triggers on `pull_request`, but its sole job declares the `github-pages` environment and runs `configure-pages`, artifact upload, and `deploy-pages` without an event/ref condition. Workflow-wide concurrency uses the constant group `pages`, allowing unrelated PR checks and deployments to cancel each other.
 

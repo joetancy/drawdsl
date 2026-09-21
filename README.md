@@ -172,6 +172,8 @@ direction right   # right, left, down, or up
 
 ## Commands
 
+Development and CI use Node 24 (`engines.node >= 24`).
+
 ```bash
 # Generate draw.io XML
 npm run generate -- input.drawdsl output.drawio

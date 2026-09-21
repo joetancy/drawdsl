@@ -8,19 +8,15 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: validate-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -32,9 +28,25 @@ jobs:
       - run: npm run lint:ts
       - run: npm test
       - run: npm run web:build
-      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/configure-pages@v6
       - id: deployment
         uses: actions/deploy-pages@v5
