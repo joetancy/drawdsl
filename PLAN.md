@@ -227,7 +227,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P09 — Add direct downloads and verify CLI behavior
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Opportunity:** The playground only exposes clipboard XML; downloading a file is a simpler path into draw.io and gives users a portable DSL backup. The CLI has no subprocess contract tests.
 

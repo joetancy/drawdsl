@@ -58,6 +58,8 @@ const formatDslButton = document.querySelector<HTMLButtonElement>("#format-dsl")
 const copyShareLink = document.querySelector<HTMLButtonElement>("#copy-share-link")!;
 const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
 const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
+const downloadDsl = document.querySelector<HTMLButtonElement>("#download-dsl")!;
+const downloadDrawio = document.querySelector<HTMLButtonElement>("#download-drawio")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
 const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
 let errorLine: number | undefined;
@@ -106,6 +108,7 @@ let shareDebounce: ReturnType<typeof setTimeout>;
 const savedDiagramsKey = "drawdsl.saved-diagrams.v1";
 let pendingDelete: SavedDiagram | undefined;
 let loadedDiagramId: string | undefined;
+let loadedDiagramName: string | undefined;
 let savedSnapshot = "";
 let savedFailed = false;
 
@@ -153,8 +156,25 @@ function savedDiagramId(): string {
 
 function setLoadedDiagram(diagram?: SavedDiagram): void {
     loadedDiagramId = diagram?.id;
+    loadedDiagramName = diagram?.name;
     saveCurrent.disabled = !diagram;
     savedCurrentStatus.textContent = diagram ? `Loaded: ${diagram.name}` : "Not saved";
+}
+
+function downloadFilename(extension: string): string {
+    const base = (loadedDiagramName ?? "diagram").trim().toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "") || "diagram";
+    return `${base.slice(0, 80)}.${extension}`;
+}
+
+function downloadFile(filename: string, content: string, mime: string): void {
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function loadSavedDiagram(diagram: SavedDiagram): void {
@@ -292,6 +312,7 @@ function markSourceChanged(): void {
     // Current source has no successful output yet; keep the last preview but
     // prevent exporting stale XML as if it were current.
     copyXml.disabled = true;
+    downloadDrawio.disabled = true;
 }
 
 function showPreview(xml: string): void {
@@ -323,6 +344,7 @@ async function render(): Promise<void> {
         lastGoodXml = xml;
         lastGoodSource = src;
         copyXml.disabled = false;
+        downloadDrawio.disabled = false;
         xmlToggle.disabled = false;
         if (showingXml) {
             source.value = xml;
@@ -344,6 +366,7 @@ async function render(): Promise<void> {
     } catch (error) {
         if (seen !== sourceRevision) return;
         copyXml.disabled = true;
+        downloadDrawio.disabled = true;
         xmlToggle.disabled = !lastGoodXml;
         reportError(error, true);
     }
@@ -546,6 +569,14 @@ copyXml.addEventListener("click", async () => {
     } catch {
         status.textContent = "Clipboard access was denied";
     }
+});
+downloadDsl.addEventListener("click", () => {
+    downloadFile(downloadFilename("drawdsl"), currentSource(), "text/plain");
+});
+downloadDrawio.addEventListener("click", () => {
+    if (!latestXml || downloadDrawio.disabled) return;
+    if (currentSource() !== lastGoodSource) return;
+    downloadFile(downloadFilename("drawio"), latestXml, "application/xml");
 });
 copyShareLink.addEventListener("click", async () => {
     const snapshot = showingXml ? dslSource : source.value;

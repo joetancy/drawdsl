@@ -36,6 +36,8 @@
                     <button id="copy-share-link" type="button">🔗 Copy share link</button>
                     <button id="xml-toggle" type="button" disabled>🧾 Show draw.io XML</button>
                     <button id="copy-xml" type="button" disabled>📋 Copy draw.io XML</button>
+                    <button id="download-dsl" type="button">⬇️ Download .drawdsl</button>
+                    <button id="download-drawio" type="button" disabled>⬇️ Download .drawio</button>
                 </div>
             </div>
             <div class="editor-input">
@@ -113,7 +115,7 @@ aws:cloud cloud "AWS Cloud" {
     }
 }</code></pre>
             <p>Children are placed left to right, then top to bottom, with smaller items centered in their cells. Resources inside the grid can still be connected, but <code>core:layout</code> containers cannot be edge endpoints.</p>
-            <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram.</p>
+            <p>Use <strong>Copy draw.io XML</strong> to copy the generated XML, then open <a href="https://app.diagrams.net/" target="_blank" rel="noreferrer">diagrams.net</a> and import or paste it into your diagram. <strong>Download .drawio</strong> saves the same output as a file, and <strong>Download .drawdsl</strong> saves the exact current source.</p>
             <p>Use <strong>Copy share link</strong> to copy a self-contained URL for this DSL. Links are compressed when possible and work without a backend; anyone with the link can read the DSL, so do not include secrets.</p>
             <p>Use <strong>Saved diagrams</strong> to keep named copies in this browser's local storage. They stay on this device and browser profile until you delete them.</p>
         </div>

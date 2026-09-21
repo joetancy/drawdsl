@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const STARTER = `direction right
 
@@ -193,4 +194,26 @@ test("dashed operators highlight the same as solid ones", async ({ page }) => {
     await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
     const operators = await page.locator('#syntax-highlight .token-operator:has-text("-.-")').count();
     expect(operators).toBeGreaterThan(0);
+});
+
+test("downloads match current source and xml, and stale xml cannot download", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    const dslDownload = page.waitForEvent("download");
+    await page.click("#download-dsl");
+    const dslPath = await (await dslDownload).path();
+    const dslText = await readFile(dslPath!, "utf8");
+    await expect(page.locator("#source")).toHaveValue(dslText);
+
+    const drawioDownload = page.waitForEvent("download");
+    await page.click("#download-drawio");
+    const drawioPath = await (await drawioDownload).path();
+    const drawioText = await readFile(drawioPath!, "utf8");
+    expect(drawioText).toContain("<mxfile");
+
+    await page.fill("#source", "bogus syntax {{{");
+    await expect(page.locator("#status")).not.toBeEmpty({ timeout: 15_000 });
+    await expect(page.locator("#download-drawio")).toBeDisabled();
 });
