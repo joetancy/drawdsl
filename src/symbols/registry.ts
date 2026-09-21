@@ -14,8 +14,10 @@ export function registeredNamespaces(): string[] {
 export function qualifiedCandidates(name: string): string[] {
     const candidates: string[] = [];
     for (const provider of providers.values()) {
-        const canonical = provider.aliases?.[name] ?? name;
-        if (provider.symbols[canonical]) candidates.push(`${provider.namespace}:${canonical}`);
+        const canonical = provider.aliases && Object.hasOwn(provider.aliases, name)
+            ? provider.aliases[name]!
+            : name;
+        if (Object.hasOwn(provider.symbols, canonical)) candidates.push(`${provider.namespace}:${canonical}`);
     }
     return candidates.sort();
 }
@@ -28,8 +30,12 @@ export function resolveSymbol(ref: SymbolRef): { ref: SymbolRef; definition: Sym
         );
     }
 
-    const canonicalName = provider.aliases?.[ref.name] ?? ref.name;
-    const definition = provider.symbols[canonicalName];
+    const canonicalName = provider.aliases && Object.hasOwn(provider.aliases, ref.name)
+        ? provider.aliases[ref.name]!
+        : ref.name;
+    const definition = Object.hasOwn(provider.symbols, canonicalName)
+        ? provider.symbols[canonicalName]!
+        : undefined;
     if (!definition) {
         const names = Object.keys(provider.symbols).filter((name) => name.includes(ref.name)).slice(0, 3);
         const hint = names.length ? `; did you mean ${names.map((name) => `${ref.namespace}:${name}`).join(", ")}` : "";

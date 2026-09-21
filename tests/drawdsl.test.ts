@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
-import { resolveSymbol } from "../src/symbols/registry.js";
+import { qualifiedCandidates, resolveSymbol } from "../src/symbols/registry.js";
 import { renderDrawio } from "../src/render/drawio.js";
 import { layoutDocument } from "../src/layout/index.js";
 import { enforceGlobalEdgeSpacing } from "../src/layout/routing.js";
@@ -552,4 +552,16 @@ test("the bundled legacy DrawDSL file still parses, lays out, and renders", asyn
     assert.match(xml, /<mxfile/);
     assert.match(xml, /id="cloud"/);
     assert.match(xml, /id="edge_1_internet_cdn"/);
+});
+
+test("inherited Object.prototype names are not symbols", () => {
+    for (const name of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+        assert.throws(() => resolveSymbol({ namespace: "core", name }), /unknown symbol/);
+        assert.throws(() => resolveSymbol({ namespace: "aws", name }), /unknown symbol/);
+        assert.throws(() => parseDsl(`core:${name} x`), /unknown symbol/);
+        assert.deepEqual(qualifiedCandidates(name), []);
+    }
+    // Existing aliases and symbols still resolve.
+    assert.equal(resolveSymbol({ namespace: "aws", name: "apigw" }).ref.name, "apigateway");
+    assert.equal(resolveSymbol({ namespace: "core", name: "box" }).ref.name, "box");
 });
