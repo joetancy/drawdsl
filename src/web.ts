@@ -57,6 +57,7 @@ const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
 const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
 const routerReady = initRouter(new URL("../node_modules/libavoid-js/dist/libavoid.wasm", import.meta.url).href);
+routerReady.catch(() => {});
 const viewerReady = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = "https://viewer.diagrams.net/js/viewer-static.min.js";
@@ -64,10 +65,13 @@ const viewerReady = new Promise<void>((resolve, reject) => {
     script.onerror = () => reject(new Error("Could not load the diagrams.net viewer"));
     document.head.append(script);
 });
-let revision = 0;
+viewerReady.catch(() => {});
+let sourceRevision = 0;
 let debounce: ReturnType<typeof setTimeout>;
 let darkMode = false;
 let latestXml = "";
+let lastGoodXml = "";
+let lastGoodSource = "";
 let dslSource = "";
 let showingXml = false;
 let shareRevision = 0;
@@ -128,6 +132,7 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     scheduleShareUrl();
     updateEditor();
     status.textContent = `Loaded ${diagram.name}`;
+    markSourceChanged();
     void render();
 }
 
@@ -271,36 +276,74 @@ function updateEditor(): void {
     lineNumbers.scrollTop = source.scrollTop;
 }
 
+function markSourceChanged(): void {
+    sourceRevision += 1;
+    // Current source has no successful output yet; keep the last preview but
+    // prevent exporting stale XML as if it were current.
+    copyXml.disabled = true;
+}
+
+function showPreview(xml: string): void {
+    const graph = document.createElement("div");
+    graph.className = "mxgraph";
+    graph.dataset.mxgraph = JSON.stringify({
+        xml,
+        nav: true,
+        resize: true,
+        toolbar: "zoom",
+        "dark-mode": darkMode ? "dark" : "light",
+    });
+    preview.replaceChildren(graph);
+    window.GraphViewer?.processElements();
+}
+
 async function render(): Promise<void> {
-    const current = ++revision;
+    const seen = sourceRevision;
+    const src = showingXml ? dslSource : source.value;
     try {
-        const ast = parseDsl(showingXml ? dslSource : source.value);
+        const ast = parseDsl(src);
         await routerReady;
+        if (seen !== sourceRevision) return;
         const result = await layoutDocument(ast);
+        if (seen !== sourceRevision) return;
         const xml = renderDrawio(result.nodes, result.edges);
-        if (current !== revision) return;
+        if (seen !== sourceRevision) return;
         latestXml = xml;
+        lastGoodXml = xml;
+        lastGoodSource = src;
         copyXml.disabled = false;
         xmlToggle.disabled = false;
-        await viewerReady;
-        if (current !== revision) return;
+        if (showingXml) {
+            source.value = xml;
+            updateEditor();
+        }
+        try {
+            await viewerReady;
+        } catch (viewerError) {
+            if (seen !== sourceRevision) return;
+            showPreviewFallback();
+            status.textContent = viewerError instanceof Error ? viewerError.message : String(viewerError);
+            return;
+        }
+        if (seen !== sourceRevision) return;
 
-        const graph = document.createElement("div");
-        graph.className = "mxgraph";
-        graph.dataset.mxgraph = JSON.stringify({
-            xml,
-            nav: true,
-            resize: true,
-            toolbar: "zoom",
-            "dark-mode": darkMode ? "dark" : "light",
-        });
-        preview.replaceChildren(graph);
-        window.GraphViewer?.processElements();
+        showPreview(xml);
         status.textContent = "";
     } catch (error) {
-        if (current !== revision) return;
-        status.textContent = error instanceof Error ? error.message : String(error);
+        if (seen !== sourceRevision) return;
+        copyXml.disabled = true;
+        xmlToggle.disabled = !lastGoodXml;
+        const message = error instanceof Error ? error.message : String(error);
+        status.textContent = lastGoodXml ? `${message} (showing last successful preview)` : message;
     }
+}
+
+function showPreviewFallback(): void {
+    // Viewer failed but compilation succeeded: keep valid XML accessible.
+    const fallback = document.createElement("div");
+    fallback.className = "mxgraph";
+    fallback.textContent = "Preview unavailable; use Show draw.io XML.";
+    preview.replaceChildren(fallback);
 }
 
 const shareParams = new URLSearchParams(location.hash.slice(1));
@@ -391,6 +434,7 @@ formatDslButton.addEventListener("click", () => {
         source.readOnly = false;
         xmlToggle.textContent = "🧾 Show draw.io XML";
         status.textContent = "Formatted successfully";
+        markSourceChanged();
         void render();
     } catch (error) {
         status.textContent = error instanceof Error ? error.message : String(error);
@@ -423,7 +467,9 @@ source.addEventListener("keydown", (event) => {
     source.dispatchEvent(new Event("input"));
 });
 copyXml.addEventListener("click", async () => {
-    if (!latestXml) return;
+    if (!latestXml || copyXml.disabled) return;
+    const currentSrc = showingXml ? dslSource : source.value;
+    if (currentSrc !== lastGoodSource) return;
     try {
         await navigator.clipboard.writeText(latestXml);
         copyXml.textContent = "✅ Copied!";
@@ -447,11 +493,12 @@ themeToggle.addEventListener("click", () => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
     themeToggle.textContent = darkMode ? "☀️ Light mode" : "🌙 Dark mode";
     themeToggle.setAttribute("aria-pressed", String(darkMode));
-    void render();
+    if (lastGoodXml) showPreview(lastGoodXml);
 });
 source.addEventListener("input", () => {
     if (showingXml) return;
     dslSource = source.value;
+    markSourceChanged();
     scheduleShareUrl();
     updateEditor();
     clearTimeout(debounce);
@@ -466,6 +513,7 @@ document.addEventListener("selectionchange", () => {
 });
 void (async () => {
     const compressedDsl = shareParams.get("z");
+    let initialError = "";
     if (compressedDsl) {
         const initialRevision = shareRevision;
         try {
@@ -473,11 +521,14 @@ void (async () => {
             if (shareRevision === initialRevision) {
                 source.value = sharedDsl;
                 dslSource = sharedDsl;
+                markSourceChanged();
             }
         } catch {
-            status.textContent = "Could not read the shared DrawDSL link";
+            initialError = "Could not read the shared DrawDSL link";
+            status.textContent = initialError;
         }
     }
     updateEditor();
     await render();
+    if (initialError && !status.textContent) status.textContent = initialError;
 })();

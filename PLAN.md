@@ -135,7 +135,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P04 — Make browser compilation revision-safe
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** `revision` increments only when `render()` starts, not when input changes. During the 300 ms debounce, an older in-flight render can still publish. Failed parses leave `latestXml` and enabled XML buttons pointing at a previous source. Theme toggles perform the entire layout again. Router/viewer initialization promises start immediately, but rejection handlers are attached only when compilation reaches their awaits.
 
