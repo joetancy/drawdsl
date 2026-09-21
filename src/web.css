@@ -15,6 +15,7 @@ body {
 header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
     min-height: 56px;
     padding: 12px 24px;
@@ -25,8 +26,10 @@ header {
 .header-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-left: auto;
+    max-width: 100%;
 }
 
 header button {
@@ -81,7 +84,7 @@ h1 { margin: 0; font-size: 20px; line-height: 24px; }
 h1 a { color: inherit; text-decoration: none; }
 header span { color: #b8c3d9; font-size: 13px; line-height: 18px; }
 
-.saved-bar { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 24px; border-bottom: 1px solid #d8deea; background: white; }
+.saved-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 48px; padding: 8px 24px; border-bottom: 1px solid #d8deea; background: white; }
 .saved-bar strong { flex: 0 0 auto; font-size: 13px; }
 .saved-bar input { width: 150px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: inherit; background: #fbfcfe; font: inherit; font-size: 13px; }
 .saved-bar button { height: 32px; padding: 0 10px; border: 1px solid #c5ccda; border-radius: 6px; color: #34405a; background: white; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
@@ -118,8 +121,8 @@ main {
 
 label { font-size: 13px; font-weight: 700; }
 
-.editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.editor-actions { display: flex; gap: 8px; }
+.editor-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.editor-actions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
 .editor-toolbar button { height: 32px; padding: 0 12px; border: 1px solid #c5ccda; border-radius: 6px; color: #34405a; background: white; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; }
 .editor-toolbar button:hover:not(:disabled) { background: #f1f4f9; }
 .editor-toolbar button:disabled { cursor: not-allowed; opacity: 0.5; }

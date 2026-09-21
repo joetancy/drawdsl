@@ -208,7 +208,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P08 — Add focused browser regressions and fix keyboard/mobile defects
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** Tests currently import compiler modules only. The editor intercepts every Tab, including Shift+Tab, leaving keyboard users without the ordinary focus exit. Toolbar/header rows have no wrapping behavior at narrow widths. `updateEditor()` retokenizes every line twice and rebuilds markup even on scroll. The highlighting operator regex uses `-.-` with an unescaped dot, unlike the parser's literal dashed operator.
 

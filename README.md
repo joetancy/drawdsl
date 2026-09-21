@@ -196,6 +196,15 @@ npm run check
 npm test
 ```
 
+Browser regressions run against the production build with a stubbed diagrams.net viewer:
+
+```bash
+npm run web:build
+npm run test:web
+```
+
+The stub covers app state (compile, save, links, clipboard, keyboard, layout) but cannot prove diagram rendering. For viewer integration, build and serve the app with network access, load a representative diagram, and confirm the preview renders without console errors.
+
 The test suite covers parsing, namespace resolution, layout, routing, formatting, provider styles, and draw.io rendering.
 
 ## Web playground

@@ -164,7 +164,7 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     showingXml = false;
     dslSource = diagram.source;
     source.value = diagram.source;
-    source.readOnly = false;
+    setEditorMode();
     source.setSelectionRange(0, 0);
     source.scrollTop = 0;
     source.scrollLeft = 0;
@@ -228,7 +228,7 @@ function tokenClass(value: string, firstToken: boolean): string {
     if (/^(?:[TRBLtrbl]:)?[A-Za-z_][\w-]*:[A-Za-z_][\w-]*$/.test(value)) return "symbol";
     if (/^(?:[TRBLtrbl]:)?[A-Za-z_][\w-]*$/.test(value)) return "identifier";
     if (/^\d+$/.test(value)) return "number";
-    if (/^(<-->|<-\.->|-->|-\.->|---|-.-)$/.test(value)) return "operator";
+    if (/^(<-->|<-\.->|-->|-\.->|---|-\.-)$/.test(value)) return "operator";
     if (/^[{}]$/.test(value)) return "brace";
     return "plain";
 }
@@ -262,7 +262,7 @@ function highlightLine(line: string): { html: string; kind: string } {
             firstToken = false;
             continue;
         }
-        const match = rest.match(/^(\s+|<-->|<-\.->|-->|-\.->|---|-.-|[TRBLtrbl]:|[A-Za-z_][\w-]*:[A-Za-z_][\w-]*|[A-Za-z_][\w-]*|\d+|[{}]|.)/s)!;
+        const match = rest.match(/^(\s+|<-->|<-\.->|-->|-\.->|---|-\.-|[TRBLtrbl]:|[A-Za-z_][\w-]*:[A-Za-z_][\w-]*|[A-Za-z_][\w-]*|\d+|[{}]|.)/s)!;
         const value = match[0]!;
         const className = /^\s+$/.test(value) ? "plain" : tokenClass(value, firstToken);
         add(value, className);
@@ -272,21 +272,19 @@ function highlightLine(line: string): { html: string; kind: string } {
     return { html: html || " ", kind };
 }
 
-function updateEditor(): void {
-    const lines = source.value.split("\n");
-    const activeLine = source.value.slice(0, source.selectionStart).split("\n").length - 1;
-    const highlighted = lines.map((line, index) => {
-        const result = showingXml ? { html: escapeHtml(line) || " ", kind: "plain" } : highlightLine(line);
-        return `<span class="editor-line${index === activeLine ? " active" : ""}">${result.html}</span>`;
-    });
-    syntaxHighlight.innerHTML = highlighted.join("");
-    lineNumbers.innerHTML = lines.map((line, index) => {
-        const kind = showingXml ? "plain" : highlightLine(line).kind;
-        return `<span class="editor-line token-${kind}${index === activeLine ? " active" : ""}">${index + 1}</span>`;
-    }).join("");
+function syncEditorScroll(): void {
     syntaxHighlight.scrollTop = source.scrollTop;
     syntaxHighlight.scrollLeft = source.scrollLeft;
     lineNumbers.scrollTop = source.scrollTop;
+}
+
+function updateEditor(): void {
+    const lines = source.value.split("\n");
+    const activeLine = source.value.slice(0, source.selectionStart).split("\n").length - 1;
+    const results = lines.map((line) => showingXml ? { html: escapeHtml(line) || " ", kind: "plain" } : highlightLine(line));
+    syntaxHighlight.innerHTML = results.map((result, index) => `<span class="editor-line${index === activeLine ? " active" : ""}">${result.html}</span>`).join("");
+    lineNumbers.innerHTML = results.map((result, index) => `<span class="editor-line token-${result.kind}${index === activeLine ? " active" : ""}">${index + 1}</span>`).join("");
+    syncEditorScroll();
 }
 
 function markSourceChanged(): void {
@@ -341,7 +339,7 @@ async function render(): Promise<void> {
         if (seen !== sourceRevision) return;
 
         showPreview(xml);
-        status.textContent = "";
+        if (!savedFailed) status.textContent = "";
         setErrorLine(undefined);
     } catch (error) {
         if (seen !== sourceRevision) return;
@@ -365,6 +363,7 @@ source.value = initialLegacy ?? starter;
 dslSource = source.value;
 savedSnapshot = source.value;
 skillSource.textContent = skillText;
+setEditorMode();
 updateEditor();
 renderSavedDiagrams();
 savedReset.addEventListener("click", () => {
@@ -490,7 +489,7 @@ formatDslButton.addEventListener("click", () => {
         source.value = formatted;
         scheduleShareUrl();
         updateEditor();
-        source.readOnly = false;
+        setEditorMode();
         xmlToggle.textContent = "🧾 Show draw.io XML";
         status.textContent = "Formatted successfully";
         setErrorLine(undefined);
@@ -501,6 +500,10 @@ formatDslButton.addEventListener("click", () => {
     }
 });
 gotoError.addEventListener("click", focusErrorLine);
+function setEditorMode(): void {
+    source.setAttribute("aria-label", showingXml ? "draw.io XML output (read-only)" : "DrawDSL source");
+    source.readOnly = showingXml;
+}
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
     showingXml = !showingXml;
@@ -508,17 +511,22 @@ xmlToggle.addEventListener("click", () => {
         dslSource = source.value;
         source.value = latestXml;
         updateEditor();
-        source.readOnly = true;
         xmlToggle.textContent = "📝 Show DSL";
     } else {
         source.value = dslSource;
         updateEditor();
-        source.readOnly = false;
         xmlToggle.textContent = "🧾 Show draw.io XML";
     }
+    setEditorMode();
 });
 source.addEventListener("keydown", (event) => {
-    if (event.key !== "Tab" || showingXml) return;
+    // Shift+Tab leaves the editor via native focus; Esc moves forward to the toolbar.
+    if (event.key === "Escape" && !showingXml) {
+        event.preventDefault();
+        formatDslButton.focus();
+        return;
+    }
+    if (event.key !== "Tab" || event.shiftKey || showingXml) return;
     event.preventDefault();
     const start = source.selectionStart;
     const end = source.selectionEnd;
@@ -568,7 +576,7 @@ source.addEventListener("input", () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => void render(), 300);
 });
-source.addEventListener("scroll", updateEditor);
+source.addEventListener("scroll", syncEditorScroll);
 source.addEventListener("focus", updateEditor);
 source.addEventListener("click", updateEditor);
 source.addEventListener("keyup", updateEditor);

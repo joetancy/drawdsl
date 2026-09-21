@@ -16,6 +16,7 @@
     "example": "node --import tsx src/drawdsl.ts examples/elk.drawdsl examples/elk.drawio",
     "examples": "npm run example",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:web": "playwright test",
     "check": "tsc --noEmit",
     "web:dev": "vite",
     "web:build": "vite build",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.0.0",
     "eslint": "^10.8.0",
