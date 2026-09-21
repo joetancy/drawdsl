@@ -190,7 +190,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P07 — Repair saved-diagram UI state and storage failure handling
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** `renderSavedDiagrams()` removes the `#saved-empty` element with `replaceChildren()` and retains a reference to the detached element, so the empty message cannot be shown again. `loadSavedDiagram()` changes `loadedDiagramId` but does not refresh active-list styling. `readSavedDiagrams()` returns `[]` for corrupt/unavailable storage, indistinguishable from an empty collection; a later save can overwrite corrupt data. Loading another diagram immediately replaces unsaved edits.
 

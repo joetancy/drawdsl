@@ -41,6 +41,7 @@ const saveCopy = document.querySelector<HTMLButtonElement>("#save-copy")!;
 const savedCurrentStatus = document.querySelector<HTMLSpanElement>("#saved-current-status")!;
 const savedEmpty = document.querySelector<HTMLSpanElement>("#saved-empty")!;
 const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
+const savedReset = document.querySelector<HTMLButtonElement>("#saved-reset")!;
 const deleteConfirm = document.querySelector<HTMLDialogElement>("#delete-confirm")!;
 const deleteConfirmName = document.querySelector<HTMLElement>("#delete-confirm-name")!;
 const deleteCancel = document.querySelector<HTMLButtonElement>("#delete-cancel")!;
@@ -105,6 +106,8 @@ let shareDebounce: ReturnType<typeof setTimeout>;
 const savedDiagramsKey = "drawdsl.saved-diagrams.v1";
 let pendingDelete: SavedDiagram | undefined;
 let loadedDiagramId: string | undefined;
+let savedSnapshot = "";
+let savedFailed = false;
 
 type SavedDiagram = { id: string; name: string; source: string };
 
@@ -114,15 +117,24 @@ function isSavedDiagram(value: unknown): value is SavedDiagram {
     return typeof diagram.id === "string" && typeof diagram.name === "string" && typeof diagram.source === "string";
 }
 
-function readSavedDiagrams(): SavedDiagram[] {
+function readSavedState(): { diagrams: SavedDiagram[]; failed: boolean } {
     try {
         const saved = localStorage.getItem(savedDiagramsKey);
-        if (!saved) return [];
+        if (!saved) return { diagrams: [], failed: false };
         const parsed: unknown = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed.filter(isSavedDiagram) : [];
+        if (!Array.isArray(parsed)) return { diagrams: [], failed: true };
+        return { diagrams: parsed.filter(isSavedDiagram), failed: false };
     } catch {
-        return [];
+        return { diagrams: [], failed: true };
     }
+}
+
+function currentSource(): string {
+    return showingXml ? dslSource : source.value;
+}
+
+function isDirtyForLoad(): boolean {
+    return currentSource() !== savedSnapshot;
 }
 
 function writeSavedDiagrams(diagrams: SavedDiagram[]): boolean {
@@ -146,7 +158,9 @@ function setLoadedDiagram(diagram?: SavedDiagram): void {
 }
 
 function loadSavedDiagram(diagram: SavedDiagram): void {
+    if (isDirtyForLoad() && !confirm(`Discard unsaved changes and load "${diagram.name}"?`)) return;
     setLoadedDiagram(diagram);
+    savedSnapshot = diagram.source;
     showingXml = false;
     dslSource = diagram.source;
     source.value = diagram.source;
@@ -157,14 +171,19 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     xmlToggle.textContent = "🧾 Show draw.io XML";
     scheduleShareUrl();
     updateEditor();
+    renderSavedDiagrams();
+    setErrorLine(undefined);
     status.textContent = `Loaded ${diagram.name}`;
     markSourceChanged();
     void render();
 }
 
 function renderSavedDiagrams(): void {
-    const diagrams = readSavedDiagrams();
-    savedEmpty.hidden = diagrams.length > 0;
+    const { diagrams, failed } = readSavedState();
+    savedFailed = failed;
+    savedEmpty.hidden = failed || diagrams.length > 0;
+    savedReset.hidden = !failed;
+    if (failed) status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
     savedDiagramsList.replaceChildren(...diagrams.map((diagram) => {
         const item = document.createElement("div");
         item.className = `saved-item${diagram.id === loadedDiagramId ? " active" : ""}`;
@@ -344,9 +363,36 @@ const initialHash = location.hash.slice(1);
 const initialLegacy = new URLSearchParams(initialHash).get("dsl");
 source.value = initialLegacy ?? starter;
 dslSource = source.value;
+savedSnapshot = source.value;
 skillSource.textContent = skillText;
 updateEditor();
 renderSavedDiagrams();
+savedReset.addEventListener("click", () => {
+    if (!savedFailed) return;
+    if (!confirm("Saved data looks corrupt. Clear it and start fresh? This cannot be undone.")) return;
+    try {
+        localStorage.removeItem(savedDiagramsKey);
+    } catch {
+        status.textContent = "Could not clear saved diagrams";
+        return;
+    }
+    renderSavedDiagrams();
+    status.textContent = "Cleared saved diagrams";
+});
+window.addEventListener("storage", (event) => {
+    if (event.key !== savedDiagramsKey) return;
+    const { diagrams, failed } = readSavedState();
+    renderSavedDiagrams();
+    if (failed) return;
+    if (isDirtyForLoad()) {
+        status.textContent = "Saved diagrams changed in another tab; your edits were kept";
+        return;
+    }
+    if (loadedDiagramId && !diagrams.some((diagram) => diagram.id === loadedDiagramId)) {
+        setLoadedDiagram();
+        status.textContent = "Loaded diagram was deleted in another tab; your edits were kept";
+    }
+});
 deleteCancel.addEventListener("click", () => {
     pendingDelete = undefined;
     deleteConfirm.close();
@@ -354,10 +400,18 @@ deleteCancel.addEventListener("click", () => {
 deleteAccept.addEventListener("click", () => {
     if (!pendingDelete) return;
     const deletedDiagram = pendingDelete;
-    if (!writeSavedDiagrams(readSavedDiagrams().filter((saved) => saved.id !== deletedDiagram.id))) {
+    const { diagrams, failed } = readSavedState();
+    if (failed) {
+        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
         return;
     }
-    if (loadedDiagramId === deletedDiagram.id) setLoadedDiagram();
+    if (!writeSavedDiagrams(diagrams.filter((saved) => saved.id !== deletedDiagram.id))) {
+        return;
+    }
+    if (loadedDiagramId === deletedDiagram.id) {
+        setLoadedDiagram();
+        savedSnapshot = currentSource();
+    }
     pendingDelete = undefined;
     deleteConfirm.close();
     renderSavedDiagrams();
@@ -371,7 +425,11 @@ deleteConfirm.addEventListener("click", (event) => {
 });
 saveCurrent.addEventListener("click", () => {
     if (!loadedDiagramId) return;
-    const diagrams = readSavedDiagrams();
+    const { diagrams, failed } = readSavedState();
+    if (failed) {
+        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+        return;
+    }
     const index = diagrams.findIndex((diagram) => diagram.id === loadedDiagramId);
     if (index < 0) {
         setLoadedDiagram();
@@ -382,6 +440,7 @@ saveCurrent.addEventListener("click", () => {
     const diagram = { ...diagrams[index]!, source: dslSource };
     diagrams[index] = diagram;
     if (!writeSavedDiagrams(diagrams)) return;
+    savedSnapshot = diagram.source;
     renderSavedDiagrams();
     status.textContent = `Saved ${diagram.name} locally`;
 });
@@ -391,9 +450,14 @@ saveCopy.addEventListener("click", () => {
         name: saveName.value.trim() || "Untitled diagram",
         source: dslSource,
     };
-    const diagrams = readSavedDiagrams();
+    const { diagrams, failed } = readSavedState();
+    if (failed) {
+        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+        return;
+    }
     if (!writeSavedDiagrams([diagram, ...diagrams])) return;
     setLoadedDiagram(diagram);
+    savedSnapshot = diagram.source;
     saveName.value = "";
     renderSavedDiagrams();
     status.textContent = `Saved ${diagram.name} locally`;
@@ -519,6 +583,7 @@ void (async () => {
         if (shareRevision === initialRevision && sourceRevision === 0) {
             source.value = dsl;
             dslSource = dsl;
+            savedSnapshot = dsl;
             markSourceChanged();
         }
     } else if (error) {
