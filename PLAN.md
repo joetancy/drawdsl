@@ -154,7 +154,7 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P05 — Make share links reliable and bounded
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 
 **Evidence:** `syncShareUrl()` can run without a revision guard for Copy share link. Startup reads `z` regardless of `v`; a decompression error message is subsequently cleared by successful starter rendering. `decompressDsl()` buffers the entire expanded stream without a size limit. There are no automated share-link tests.
 

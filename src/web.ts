@@ -5,6 +5,7 @@ import { layoutDocument } from "./layout/index.js";
 import { parseDsl } from "./parser.js";
 import { formatDsl } from "./formatter.js";
 import { renderDrawio } from "./render/drawio.js";
+import { buildShareHash, resolveShareDsl } from "./share.js";
 
 declare global {
     interface Window {
@@ -162,40 +163,8 @@ function renderSavedDiagrams(): void {
     }));
 }
 
-function bytesToBase64Url(bytes: Uint8Array): string {
-    let binary = "";
-    for (let index = 0; index < bytes.length; index += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-    }
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlToBytes(value: string): ArrayBuffer {
-    const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes.buffer;
-}
-
-async function compressDsl(value: string): Promise<string> {
-    const compressed = new Blob([new TextEncoder().encode(value)]).stream().pipeThrough(new CompressionStream("gzip"));
-    return bytesToBase64Url(new Uint8Array(await new Response(compressed).arrayBuffer()));
-}
-
-async function decompressDsl(value: string): Promise<string> {
-    const decompressed = new Blob([base64UrlToBytes(value)]).stream().pipeThrough(new DecompressionStream("gzip"));
-    return new TextDecoder().decode(await new Response(decompressed).arrayBuffer());
-}
-
-async function syncShareUrl(expectedRevision?: number): Promise<void> {
-    const rawHash = `dsl=${encodeURIComponent(dslSource)}`;
-    let hash = rawHash;
-    try {
-        const compressedHash = `v=1&z=${await compressDsl(dslSource)}`;
-        if (compressedHash.length < rawHash.length) hash = compressedHash;
-    } catch {
-        // Compression Streams are unavailable; raw links remain shareable.
-    }
+async function syncShareUrl(snapshot: string, expectedRevision?: number): Promise<void> {
+    const hash = await buildShareHash(snapshot);
     if (expectedRevision !== undefined && expectedRevision !== shareRevision) return;
     history.replaceState(null, "", `#${hash}`);
 }
@@ -203,7 +172,7 @@ async function syncShareUrl(expectedRevision?: number): Promise<void> {
 function scheduleShareUrl(): void {
     const revision = ++shareRevision;
     clearTimeout(shareDebounce);
-    shareDebounce = setTimeout(() => { void syncShareUrl(revision); }, 3000);
+    shareDebounce = setTimeout(() => { void syncShareUrl(dslSource, revision); }, 3000);
 }
 
 function escapeHtml(value: string): string {
@@ -346,8 +315,9 @@ function showPreviewFallback(): void {
     preview.replaceChildren(fallback);
 }
 
-const shareParams = new URLSearchParams(location.hash.slice(1));
-source.value = shareParams.get("dsl") ?? starter;
+const initialHash = location.hash.slice(1);
+const initialLegacy = new URLSearchParams(initialHash).get("dsl");
+source.value = initialLegacy ?? starter;
 dslSource = source.value;
 skillSource.textContent = skillText;
 updateEditor();
@@ -479,8 +449,11 @@ copyXml.addEventListener("click", async () => {
     }
 });
 copyShareLink.addEventListener("click", async () => {
+    const snapshot = showingXml ? dslSource : source.value;
+    const revision = shareRevision;
     try {
-        await syncShareUrl();
+        await syncShareUrl(snapshot, revision);
+        if (revision !== shareRevision) return;
         await navigator.clipboard.writeText(location.href);
         copyShareLink.textContent = "✅ Copied!";
         setTimeout(() => { copyShareLink.textContent = "🔗 Copy share link"; }, 1200);
@@ -512,21 +485,18 @@ document.addEventListener("selectionchange", () => {
     if (document.activeElement === source) updateEditor();
 });
 void (async () => {
-    const compressedDsl = shareParams.get("z");
     let initialError = "";
-    if (compressedDsl) {
-        const initialRevision = shareRevision;
-        try {
-            const sharedDsl = await decompressDsl(compressedDsl);
-            if (shareRevision === initialRevision) {
-                source.value = sharedDsl;
-                dslSource = sharedDsl;
-                markSourceChanged();
-            }
-        } catch {
-            initialError = "Could not read the shared DrawDSL link";
-            status.textContent = initialError;
+    const initialRevision = shareRevision;
+    const { dsl, error } = await resolveShareDsl(initialHash);
+    if (dsl !== null) {
+        if (shareRevision === initialRevision && sourceRevision === 0) {
+            source.value = dsl;
+            dslSource = dsl;
+            markSourceChanged();
         }
+    } else if (error) {
+        initialError = error;
+        status.textContent = initialError;
     }
     updateEditor();
     await render();
