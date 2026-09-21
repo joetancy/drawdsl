@@ -217,11 +217,29 @@ function validAttachment(point: Point, adjacent: Point, original: Point, node: F
         || (original.y === node.y + node.height && point.y === original.y && point.x >= node.x && point.x <= node.x + node.width && adjacent.y > point.y && adjacent.x === point.x);
 }
 
-function straightenRoutes(nodes: FlatLayoutNode[], paths: RoutePath[], config: LayoutConfig): void {
+type CleanupIndex = {
+    byId: Map<string, FlatLayoutNode>;
+    borders: LineSegment[];
+    obstaclesByEdge: Map<string, Rect[]>;
+};
+
+// Nodes are fixed for the whole cleanup pass, so build per-edge obstacles once
+// instead of recomputing them for every path in every phase.
+function buildCleanupIndex(nodes: FlatLayoutNode[], paths: RoutePath[]): CleanupIndex {
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const borders = containerBorders(nodes);
+    const obstaclesByEdge = new Map<string, Rect[]>();
     for (const path of paths) {
-        const obstacles = paddedObstacles(routeObstacles(nodes, path.edge), config.edgeEndpointClearance);
+        if (!obstaclesByEdge.has(path.edge.id)) obstaclesByEdge.set(path.edge.id, routeObstacles(nodes, path.edge));
+    }
+    return { byId, borders, obstaclesByEdge };
+}
+
+function straightenRoutes(nodes: FlatLayoutNode[], paths: RoutePath[], config: LayoutConfig, index: CleanupIndex): void {
+    const { byId, borders } = index;
+    for (const path of paths) {
+        const base = index.obstaclesByEdge.get(path.edge.id) ?? [];
+        const obstacles = paddedObstacles(base, config.edgeEndpointClearance);
         // Endpoints are not routing obstacles, but a shortcut must not cut through their icons.
         for (const id of [path.edge.source, path.edge.target]) {
             const node = byId.get(id);
@@ -332,14 +350,15 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
         const route = routes.get(edge.id);
         return route ? [{ edge, route, points: [route.sourcePoint, ...route.bendPoints, route.targetPoint] }] : [];
     });
-    straightenRoutes(nodes, paths, config);
-    const obstacles = new Map(paths.map((path) => [path.edge.id, paddedObstacles(routeObstacles(nodes, path.edge), config.edgeEndpointClearance)]));
-    const borders = containerBorders(nodes);
+    const index = buildCleanupIndex(nodes, paths);
+    straightenRoutes(nodes, paths, config, index);
+    const obstacles = new Map(paths.map((path) => [path.edge.id, paddedObstacles(index.obstaclesByEdge.get(path.edge.id) ?? [], config.edgeEndpointClearance)]));
+    const { borders } = index;
     for (const path of paths) {
         obstacles.get(path.edge.id)!.push(...nodes.filter((node) => !isContainer(node) && (node.id === path.edge.source || node.id === path.edge.target)));
     }
     clearContainerBorders(paths, borders, obstacles, config);
-    straightenRoutes(nodes, paths, config);
+    straightenRoutes(nodes, paths, config, index);
     const maxAdjustments = Math.max(paths.length * 8, 1);
     for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
         const baseline = conflictScore(paths, config.edgeSpacing);

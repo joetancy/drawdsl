@@ -17,6 +17,7 @@
     "examples": "npm run example",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:web": "playwright test",
+    "bench": "node --import tsx scripts/bench.ts",
     "check": "tsc --noEmit",
     "web:dev": "vite",
     "web:build": "vite build",

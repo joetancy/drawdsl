@@ -244,7 +244,17 @@ Also, both `core:image x` and `core:image x "javascript:alert(1)"` currently par
 
 ## P10 — Profile before optimizing layout or moving it to a worker
 
-- [ ] Measure and record findings; implement only justified changes.
+- [x] Measure and record findings; implement only justified changes.
+
+**Findings (2026-09-21, `npm run bench`, node v24.16.0, darwin-arm64, deterministic fixtures, median of 5 after 2 warm-ups):**
+
+| Fixture | Nodes/edges | Parse | Place (ELK) | Route (libavoid + cleanup) | Render | Total |
+| --- | --- | --- | --- | --- | --- | --- |
+| Small (~25) | 28/30 | 0.1 ms | 6.8 ms | 7.4 ms | 0.2 ms | 15.5 ms |
+| Medium (~100) | 110/124 | 0.2 ms | 15.1 ms | 132.5 ms | 0.6 ms | 148.6 ms |
+| Large (~300) | 330/374 | 0.4 ms | 79–89 ms | ~2.2–2.4 s | ~1.8 ms | ~2.3–2.5 s |
+
+Cheapest fix applied: `enforceGlobalEdgeSpacing` cleanup now builds per-edge obstacles/borders/indexes once per compile (`buildCleanupIndex`) instead of rebuilding them per path per phase. All 45 compiler tests pass unchanged (geometry preserved). Re-measured after: small 14.7 ms, medium 146.2 ms, large ~2.47 s — neutral within noise, confirming the dominant cost is upstream libavoid WASM `routeEdges`, not the TS cleanup. Typical diagrams (<50 nodes) compile in ~15–30 ms, inside the ~100 ms budget; only 100+ node diagrams exceed it. No Web Worker added: compilation already debounces off keystrokes, and the pipeline move should happen once together with the future SVG renderer per FUTURE_RENDERER_PLAN.md. No hardware-dependent timing assertions added to CI.
 
 **Evidence:** `routing.ts` repeatedly constructs obstacles/segments and scores segment pairs; `elk.ts` scans all document edges for projected layouts. Browser layout runs in the main JS context. These are potential hotspots, not measured regressions. The build-size warning alone does not justify a bundling rewrite.
 
