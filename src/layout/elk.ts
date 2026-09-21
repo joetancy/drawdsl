@@ -33,15 +33,11 @@ function directOwner(container: AstNode | undefined, id: string, nodesById: Map<
 
 function projectedEdges(container: AstNode | undefined, children: PositionedNode[], ast: DocumentAst, nodesById: Map<string, AstNode>): ElkExtendedEdge[] {
     const childIds = new Set(children.map((child) => child.ast.id));
-    const seen = new Set<string>();
     const edges: ElkExtendedEdge[] = [];
     for (const edge of ast.edges) {
         const source = directOwner(container, edge.source, nodesById);
         const target = directOwner(container, edge.target, nodesById);
         if (!source || !target || source === target || !childIds.has(source) || !childIds.has(target)) continue;
-        const key = `${source}\u0000${target}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
         edges.push({ id: `${container?.id ?? "root"}_${edges.length}`, sources: [source], targets: [target] });
     }
     return edges;

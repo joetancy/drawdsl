@@ -192,7 +192,7 @@ npm run check
 npm test
 ```
 
-The test suite covers parsing, namespace resolution, formatting, provider styles, and draw.io rendering.
+The test suite covers parsing, namespace resolution, layout, routing, formatting, provider styles, and draw.io rendering.
 
 ## Web playground
 
@@ -212,3 +212,14 @@ npm run web:preview
 The repository deploys the playground to `https://joetancy.github.io/drawdsl/` on pushes to `main`. In GitHub, select **Settings → Pages → Build and deployment → Source → GitHub Actions** once to enable it.
 
 Use **Copy share link** to copy a self-contained link to the current DSL. The playground stores the diagram in the URL fragment, compressing it when that produces a shorter link; no diagram data is sent to or stored by a backend. The URL updates three seconds after you stop typing, while the copy button always creates the current link immediately. Anyone with the link can read its contents, so do not include secrets.
+
+The editor highlights DSL syntax and reports errors inline. Use **Format DrawDSL** to normalize indentation, **Show draw.io XML** to inspect the generated output (with **Copy draw.io XML** to copy it), and **Dark mode** to toggle the preview theme. **DSL guide** and **SKILL.md** open the authoring help; the skill text is loaded from `SKILL.md` and can be copied for LLM-assisted diagramming.
+
+Use **Saved** to keep named diagrams in this browser's local storage (via **Save copy**, with **Save** updating the loaded diagram). Saved diagrams stay on the device until deleted and are never sent anywhere.
+
+## Recent fixes
+
+- Labels decode `\n`, `\"`, and `\\` in a single pass, so a literal `\\n` stays backslash-plus-n instead of becoming a newline.
+- Parallel edges between the same nodes are all passed to ELK instead of being collapsed to one.
+- The playground skill dialog loads `SKILL.md` at build time instead of shipping a second copy in `index.html`.
+- CI runs type-check, lint, and tests on pull requests as well as `main`.

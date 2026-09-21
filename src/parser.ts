@@ -33,7 +33,8 @@ export function hasUnclosedQuote(line: string): boolean {
 }
 
 function unescapeQuoted(value: string): string {
-    return value.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    // ponytail: single pass so `\\n` (backslash + n) is not decoded as newline.
+    return value.replace(/\\(.)/g, (match, code: string) => code === "n" ? "\n" : code === '"' ? '"' : code === "\\" ? "\\" : match);
 }
 
 function unquoteLabel(value?: string): string | undefined {

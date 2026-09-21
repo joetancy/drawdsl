@@ -527,6 +527,21 @@ test("explicit edge spacing does not add bends to preserve a preferred lane gap"
     assert.equal(routes.get("second")!.bendPoints.length, 2);
 });
 
+test("labels decode backslash, quote, and newline escapes in one pass", () => {
+    const ast = parseDsl('aws:lambda newline "a\\nb"\naws:lambda slash "a\\\\nb"\naws:lambda quote "a\\"b"\naws:lambda backslash "a\\\\b"');
+    assert.deepEqual(ast.nodes.map((node) => node.label), ["a\nb", "a\\nb", 'a"b', "a\\b"]);
+});
+
+test("formatter output is idempotent and re-parses to the same document", () => {
+    const source = 'direction right\n\naws:cloud cloud "Cloud" {\naws:lambda fn "Fn"\n}\naws:sqs queue\n\nfn --> queue : work\n';
+    const formatted = formatDsl(source);
+    assert.equal(formatDsl(formatted), formatted);
+    const before = parseDsl(source);
+    const after = parseDsl(formatted);
+    assert.deepEqual(after.nodes.map((node) => node.id), before.nodes.map((node) => node.id));
+    assert.deepEqual(after.edges.map((edge) => [edge.source, edge.target, edge.label]), before.edges.map((edge) => [edge.source, edge.target, edge.label]));
+});
+
 test("the bundled legacy DrawDSL file still parses, lays out, and renders", async () => {
     const source = await readFile(new URL("../examples/elk.drawdsl", import.meta.url), "utf8");
     const ast = parseDsl(source);

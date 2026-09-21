@@ -1,4 +1,5 @@
 import "./web.css";
+import skillText from "../SKILL.md?raw";
 import { init as initRouter } from "@mr_mint/elkjs-libavoid";
 import { layoutDocument } from "./layout/index.js";
 import { parseDsl } from "./parser.js";
@@ -305,6 +306,7 @@ async function render(): Promise<void> {
 const shareParams = new URLSearchParams(location.hash.slice(1));
 source.value = shareParams.get("dsl") ?? starter;
 dslSource = source.value;
+skillSource.textContent = skillText;
 updateEditor();
 renderSavedDiagrams();
 deleteCancel.addEventListener("click", () => {
