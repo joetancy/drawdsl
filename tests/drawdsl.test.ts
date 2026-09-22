@@ -8,6 +8,7 @@ import { renderDrawio } from "../src/render/drawio.js";
 import { layoutDocument } from "../src/layout/index.js";
 import { enforceGlobalEdgeSpacing } from "../src/layout/routing.js";
 import { DEFAULT_LAYOUT_CONFIG } from "../src/config.js";
+import { compileDrawDsl } from "../src/compiler.js";
 
 test("requires namespaces and resolves aliases", () => {
     const ast = parseDsl('aws:apigw gateway "Gateway"\ncore:text note "Hello"\n gateway --> note');
@@ -15,6 +16,12 @@ test("requires namespaces and resolves aliases", () => {
     assert.equal(ast.edges.length, 1);
     assert.throws(() => parseDsl("lambda handler"), /must be namespaced/);
     assert.doesNotThrow(() => parseDsl("layout elk\naws:lambda handler"));
+});
+
+test("compiler boundary produces native draw.io XML", async () => {
+    const xml = await compileDrawDsl("aws:lambda source\naws:sqs target\nsource --> target");
+    assert.match(xml, /<mxfile/);
+    assert.match(xml, /source="source" target="target"/);
 });
 
 test("supports bidirectional solid and dashed connections", () => {

@@ -1,9 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import process from "node:process";
+import { compileDrawDsl } from "./compiler.js";
 import { formatDsl } from "./formatter.js";
-import { layoutDocument } from "./layout/index.js";
 import { parseDsl } from "./parser.js";
-import { renderDrawio } from "./render/drawio.js";
 
 function usage(): void {
     console.error("Usage: npx tsx src/drawdsl.ts input.drawdsl output.drawio\n       npx tsx src/drawdsl.ts --check input.drawdsl\n       npx tsx src/drawdsl.ts --format [--write] input.drawdsl");
@@ -29,8 +28,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         return;
     }
     if (!command || !second || args.length !== 2) return usage();
-    const ast = parseDsl(await readFile(command, "utf8"));
-    const result = await layoutDocument(ast);
-    await writeFile(second, renderDrawio(result.nodes, result.edges), "utf8");
+    await writeFile(second, await compileDrawDsl(await readFile(command, "utf8")), "utf8");
     console.log(`Created ${second}`);
 }

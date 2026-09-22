@@ -1,10 +1,9 @@
 import "./web.css";
 import skillText from "../SKILL.md?raw";
 import { init as initRouter } from "@mr_mint/elkjs-libavoid";
-import { layoutDocument } from "./layout/index.js";
+import { compileDrawDsl } from "./compiler.js";
 import { parseDsl } from "./parser.js";
 import { formatDsl } from "./formatter.js";
-import { renderDrawio } from "./render/drawio.js";
 import { buildShareHash, resolveShareDsl } from "./share.js";
 import { DslError } from "./model.js";
 import {
@@ -452,12 +451,9 @@ async function render(): Promise<void> {
     const seen = sourceRevision;
     const src = showingXml ? dslSource : getEditorFull();
     try {
-        const ast = parseDsl(src);
         await routerReady;
         if (seen !== sourceRevision) return;
-        const result = await layoutDocument(ast);
-        if (seen !== sourceRevision) return;
-        const xml = renderDrawio(result.nodes, result.edges);
+        const xml = await compileDrawDsl(src);
         if (seen !== sourceRevision) return;
         latestXml = xml;
         lastGoodXml = xml;
