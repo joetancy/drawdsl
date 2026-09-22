@@ -51,13 +51,10 @@ function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string
     return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
 }
 
-export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
+export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
     const lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<mxfile host="app.diagrams.net" agent="drawdsl" version="26.0.0" type="device">',
-        '  <diagram id="drawdsl" name="Architecture">',
-        '    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
-        "      <root>", '        <mxCell id="0"/>', '        <mxCell id="1" parent="0"/>',
+        '<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
+        "  <root>", '    <mxCell id="0"/>', '    <mxCell id="1" parent="0"/>',
     ];
     const ordered = nodes.filter(isRenderable).sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
     const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -70,18 +67,23 @@ export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): stri
         const parentNode = parentFor(node); const parent = parentNode?.id ?? "1";
         const x = parentNode ? node.x - parentNode.x : node.x; const y = parentNode ? node.y - parentNode.y : node.y;
         const value = node.symbol.namespace === "core" && node.symbol.name === "image" ? "" : node.label;
-        lines.push(`        <mxCell id="${xmlEscape(node.id)}" value="${labelForXml(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
-        lines.push(`          <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "        </mxCell>");
+        lines.push(`    <mxCell id="${xmlEscape(node.id)}" value="${labelForXml(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
+        lines.push(`      <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "    </mxCell>");
     }
     for (const edge of edges) {
-        lines.push(`        <mxCell id="${xmlEscape(edge.id)}" value="${labelForXml(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '          <mxGeometry relative="1" as="geometry">');
+        lines.push(`    <mxCell id="${xmlEscape(edge.id)}" value="${labelForXml(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '      <mxGeometry relative="1" as="geometry">');
         if (edge.points.length) {
-            lines.push('            <Array as="points">');
-            for (const point of edge.points) lines.push(`              <mxPoint x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}"/>`);
-            lines.push("            </Array>");
+            lines.push('        <Array as="points">');
+            for (const point of edge.points) lines.push(`          <mxPoint x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}"/>`);
+            lines.push("        </Array>");
         }
-        lines.push("          </mxGeometry>", "        </mxCell>");
+        lines.push("      </mxGeometry>", "    </mxCell>");
     }
-    lines.push("      </root>", "    </mxGraphModel>", "  </diagram>", "</mxfile>");
+    lines.push("  </root>", "</mxGraphModel>");
     return `${lines.join("\n")}\n`;
+}
+
+export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
+    const model = renderMxGraphModel(nodes, edges);
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<mxfile host="app.diagrams.net" agent="drawdsl" version="26.0.0" type="device">\n  <diagram id="drawdsl" name="Architecture">\n${model.split("\n").map((line) => `    ${line}`).join("\n")}\n  </diagram>\n</mxfile>\n`;
 }

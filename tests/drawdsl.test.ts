@@ -4,7 +4,7 @@ import test from "node:test";
 import { formatDsl } from "../src/formatter.js";
 import { parseDsl } from "../src/parser.js";
 import { qualifiedCandidates, resolveSymbol } from "../src/symbols/registry.js";
-import { renderDrawio } from "../src/render/drawio.js";
+import { renderDrawio, renderMxGraphModel } from "../src/render/drawio.js";
 import { layoutDocument } from "../src/layout/index.js";
 import { enforceGlobalEdgeSpacing } from "../src/layout/routing.js";
 import { DEFAULT_LAYOUT_CONFIG } from "../src/config.js";
@@ -22,6 +22,15 @@ test("compiler boundary produces native draw.io XML", async () => {
     const xml = await compileDrawDsl("aws:lambda source\naws:sqs target\nsource --> target");
     assert.match(xml, /<mxfile/);
     assert.match(xml, /source="source" target="target"/);
+});
+
+test("mxGraph model renderer is usable without a draw.io file wrapper", async () => {
+    const ast = parseDsl("aws:lambda source\naws:sqs target\nsource --> target");
+    const layout = await layoutDocument(ast);
+    const model = renderMxGraphModel(layout.nodes, layout.edges);
+    assert.match(model, /^<mxGraphModel/);
+    assert.match(model, /source="source" target="target"/);
+    assert.doesNotMatch(model, /<mxfile|<diagram/);
 });
 
 test("supports bidirectional solid and dashed connections", () => {
