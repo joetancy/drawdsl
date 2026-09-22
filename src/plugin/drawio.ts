@@ -3,8 +3,19 @@ import { compileDrawDsl } from "../compiler.js";
 import { formatDsl } from "../formatter.js";
 
 declare const Draw: { loadPlugin(callback: (ui: any) => void): void };
+declare const mxCodec: new (document?: Document) => { decode(node: Node): any };
 
 const routerReady = initRouter(new URL(/* @vite-ignore */ "./libavoid.wasm", import.meta.url).href);
+
+function importXml(ui: any, xml: string): void {
+    const document = new DOMParser().parseFromString(xml, "text/xml");
+    const modelNode = document.documentElement.querySelector("mxGraphModel");
+    if (!modelNode) throw new Error("Compiler did not produce a graph model");
+    const model = new mxCodec(document).decode(modelNode);
+    const cells = model.getChildCells(model.getCell("1"));
+    const imported = ui.editor.graph.importCells(cells, 0, 0, ui.editor.graph.getDefaultParent());
+    ui.editor.graph.setSelectionCells(imported);
+}
 
 function openDrawDslEditor(ui: any): void {
     const root = document.createElement("div");
@@ -27,8 +38,8 @@ function openDrawDslEditor(ui: any): void {
         button("Apply", async () => {
             try {
                 await routerReady;
-                await compileDrawDsl(source.value);
-                status.textContent = "Compiled. Graph import will be added next.";
+                importXml(ui, await compileDrawDsl(source.value));
+                ui.hideDialog();
             } catch (error) {
                 status.textContent = error instanceof Error ? error.message : String(error);
             }
