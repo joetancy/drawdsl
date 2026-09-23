@@ -388,6 +388,50 @@ test("global edge spacing preserves a clear straight route", () => {
     assert.deepEqual(routes.get("straight")!.bendPoints, []);
 });
 
+test("edges from different sources keep separate lanes through a shared target", () => {
+    const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
+    const point = (x: number, y: number) => ({ x, y });
+    for (const vertical of [false, true]) {
+        const p = (x: number, y: number) => vertical ? point(y, x) : point(x, y);
+        const positions = [p(280, 64), p(248, 640), p(760, 853)];
+        const nodes = ["a", "b", "c"].map((id, declarationOrder) => ({
+            id, symbol: icon.ref, definition: icon.definition, label: id,
+            ...positions[declarationOrder]!,
+            width: 80, height: 80, declarationOrder,
+        }));
+        for (const pinned of [false, true]) {
+            const edges = ["a", "b"].map((source, declarationOrder) => ({ id: source, source, target: "c", ...(pinned ? { targetSide: (vertical ? "top" : "left") as "top" | "left" } : {}), operator: "-->" as const, declarationOrder }));
+            const routes = new Map([
+                ["a", { sourcePoint: p(360, 144), bendPoints: [p(600, 144), p(600, 869)], targetPoint: p(760, 869) }],
+                ["b", { sourcePoint: p(328, 720), bendPoints: [p(328, 869)], targetPoint: p(760, 869) }],
+            ]);
+            enforceGlobalEdgeSpacing(nodes, edges, routes, DEFAULT_LAYOUT_CONFIG);
+            assert.notDeepEqual(routes.get("a")!.targetPoint, routes.get("b")!.targetPoint);
+            assert.ok(Math.abs((vertical ? routes.get("a")!.targetPoint.x - routes.get("b")!.targetPoint.x : routes.get("a")!.targetPoint.y - routes.get("b")!.targetPoint.y)) >= DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+            for (const route of routes.values()) {
+                const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
+                assert.ok(points.every((point, i) => i === 0 || point.x === points[i - 1]!.x || point.y === points[i - 1]!.y));
+            }
+        }
+    }
+});
+
+test("pinned sides retain distinct routed attachment positions in draw.io", () => {
+    const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
+    const nodes = ["a", "b", "c"].map((id, declarationOrder) => ({
+        id, symbol: icon.ref, definition: icon.definition, label: id,
+        x: declarationOrder === 2 ? 300 : 0, y: declarationOrder * 100,
+        width: 80, height: 80, declarationOrder,
+    }));
+    const edges = ["a", "b"].map((source, declarationOrder) => ({
+        id: source, source, target: "c", targetSide: "left" as const, operator: "-->" as const,
+        declarationOrder, points: [], targetPoint: { x: 300, y: 220 + declarationOrder * 20 },
+    }));
+    const xml = renderMxGraphModel(nodes, edges);
+    assert.match(xml, /id="a"[^\n]*entryX=0\.0000;entryY=0\.2500/);
+    assert.match(xml, /id="b"[^\n]*entryX=0\.0000;entryY=0\.5000/);
+});
+
 test("route cleanup removes offset jogs while preserving ports, obstacles, and separate edges", () => {
     const symbol = resolveSymbol({ namespace: "aws", name: "lambda" });
     for (const vertical of [false, true]) {

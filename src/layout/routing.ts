@@ -308,6 +308,19 @@ function nudgePath(segment: Segment, offset: number, endpointClearance: number):
     return simplifyWaypoints([...points.slice(0, index + 1), shifted(segment.start, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset), ...points.slice(index + 1)]);
 }
 
+function moveTerminalLane(segment: Segment, offset: number, node: FlatLayoutNode | undefined): Point[] | undefined {
+    const { points, route } = segment.path;
+    if (segment.index !== points.length - 2) return undefined;
+    const junction = pointAlong(segment.start, segment.end, Math.min(
+        (Math.abs(segment.end.x - segment.start.x) + Math.abs(segment.end.y - segment.start.y)) / 2, 40,
+    ));
+    const candidate = points.length >= 3
+        ? [...points.slice(0, -2), shifted(segment.start, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset)]
+        : [segment.start, junction, shifted(junction, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset)];
+    if (!validAttachment(candidate.at(-1)!, candidate.at(-2)!, route.targetPoint, node, false)) return undefined;
+    return simplifyWaypoints(candidate);
+}
+
 function clearContainerBorders(paths: RoutePath[], borders: LineSegment[], obstacles: Map<string, Rect[]>, config: LayoutConfig): void {
     for (const path of paths) {
         let conflicts = boundaryConflicts(path, borders, config.edgeEndpointClearance);
@@ -380,17 +393,22 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                 if (a.path === b.path || !tooClose(a, b, config.edgeSpacing)) continue;
                 for (const segment of [b, a]) {
                     for (const multiplier of [1, -1, 2, -2, 3, -3]) {
-                        const candidate = nudgePath(segment, multiplier * config.edgeSpacing, config.edgeEndpointClearance);
-                        if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
-                        if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
-                        if (simplifyWaypoints(candidate).length > simplifyWaypoints(segment.path.points).length) continue;
-                        const original = segment.path.points;
-                        segment.path.points = candidate;
-                        if (conflictScore(paths, config.edgeSpacing) < baseline) {
-                            adjusted = true;
-                            break;
+                        const offset = multiplier * config.edgeSpacing;
+                        const terminal = a.path.edge.target === b.path.edge.target
+                            ? moveTerminalLane(segment, offset, index.byId.get(segment.path.edge.target)) : undefined;
+                        for (const candidate of [terminal, nudgePath(segment, offset, config.edgeEndpointClearance)]) {
+                            if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
+                            if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
+                            if (candidate !== terminal && candidate.length > simplifyWaypoints(segment.path.points).length) continue;
+                            const original = segment.path.points;
+                            segment.path.points = candidate;
+                            if (conflictScore(paths, config.edgeSpacing) < baseline) {
+                                adjusted = true;
+                                break;
+                            }
+                            segment.path.points = original;
                         }
-                        segment.path.points = original;
+                        if (adjusted) break;
                     }
                     if (adjusted) break;
                 }

@@ -39,8 +39,8 @@ function attachment(prefix: "exit" | "entry", point: Point | undefined, node: Fl
                 : side === "left" ? { x: 0, y: 0.5 }
                     : undefined;
     if (!sidePoint && !point) return [];
-    const x = (sidePoint?.x ?? clamp((point!.x - node.x) / node.width)).toFixed(4);
-    const y = (sidePoint?.y ?? clamp((point!.y - node.y) / node.height)).toFixed(4);
+    const x = (point ? clamp((point.x - node.x) / node.width) : sidePoint!.x).toFixed(4);
+    const y = (point ? clamp((point.y - node.y) / node.height) : sidePoint!.y).toFixed(4);
     return [`${prefix}X=${x}`, `${prefix}Y=${y}`, `${prefix}Perimeter=1`];
 }
 
