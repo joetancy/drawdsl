@@ -62,9 +62,10 @@ body {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
     min-width: 320px;
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
     margin: 0;
+    overflow: hidden;
     background: var(--app-bg);
 }
 
@@ -193,6 +194,7 @@ main {
     display: grid;
     min-height: 0;
     grid-template-columns: minmax(350px, 40%) minmax(0, 1fr);
+    overflow: hidden;
 }
 
 .editor-pane, .preview-pane { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; padding: 16px 18px; }
@@ -269,7 +271,7 @@ dialog::backdrop { background: #10152280; backdrop-filter: blur(3px); }
     .document-toolbar { min-height: 54px; gap: 4px; padding: 7px 12px; }
     .saved-current-status { max-width: 92px; }
     .toolbar-button, .menu-disclosure > summary { min-height: 38px; padding: 0 8px; }
-    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(420px, 58vh) minmax(420px, 60vh); }
+    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(calc(100dvh - 114px), auto) minmax(420px, 60vh); overflow-x: hidden; overflow-y: auto; }
     .editor-pane, .preview-pane { padding: 12px; }
     .editor-pane { border-right: 0; border-bottom: 1px solid var(--border); }
     .editor-heading { align-items: flex-start; }

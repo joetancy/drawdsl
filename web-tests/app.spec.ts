@@ -203,6 +203,16 @@ test("narrow viewport keeps essential controls reachable", async ({ page }) => {
     await openMenu(page, "saved-menu");
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth).toBeLessThanOrEqual(361);
+    const sizing = await page.evaluate(() => ({
+        documentHeight: document.documentElement.scrollHeight,
+        viewportHeight: window.innerHeight,
+        editorBottom: document.querySelector(".editor-pane")!.getBoundingClientRect().bottom,
+        mainClientHeight: document.querySelector("main")!.clientHeight,
+        mainScrollHeight: document.querySelector("main")!.scrollHeight,
+    }));
+    expect(sizing.documentHeight).toBeLessThanOrEqual(sizing.viewportHeight);
+    expect(sizing.editorBottom).toBeLessThanOrEqual(sizing.viewportHeight);
+    expect(sizing.mainScrollHeight).toBeGreaterThan(sizing.mainClientHeight);
     for (const id of ["#format-dsl", "#copy-share-link", "#xml-toggle", "#copy-xml", "#save-copy", "#theme-toggle"]) {
         await expect(page.locator(id)).toBeVisible();
     }
