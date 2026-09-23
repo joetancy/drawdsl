@@ -37,11 +37,13 @@ handler --> data
 const source = document.querySelector<HTMLDivElement>("#source")!;
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
+const previewStatus = document.querySelector<HTMLSpanElement>("#preview-status")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
 const saveCopy = document.querySelector<HTMLButtonElement>("#save-copy")!;
 const savedCurrentStatus = document.querySelector<HTMLSpanElement>("#saved-current-status")!;
+const savedCount = document.querySelector<HTMLSpanElement>("#saved-count")!;
 const savedEmpty = document.querySelector<HTMLSpanElement>("#saved-empty")!;
 const savedDiagramsList = document.querySelector<HTMLDivElement>("#saved-diagrams-list")!;
 const savedReset = document.querySelector<HTMLButtonElement>("#saved-reset")!;
@@ -58,6 +60,7 @@ const skillClose = document.querySelector<HTMLButtonElement>("#skill-close")!;
 const copySkill = document.querySelector<HTMLButtonElement>("#copy-skill")!;
 const skillSource = document.querySelector<HTMLElement>("#skill-source")!;
 const formatDslButton = document.querySelector<HTMLButtonElement>("#format-dsl")!;
+const sourceMode = document.querySelector<HTMLSpanElement>("#source-mode")!;
 const copyShareLink = document.querySelector<HTMLButtonElement>("#copy-share-link")!;
 const xmlToggle = document.querySelector<HTMLButtonElement>("#xml-toggle")!;
 const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
@@ -65,6 +68,7 @@ const downloadDsl = document.querySelector<HTMLButtonElement>("#download-dsl")!;
 const downloadDrawio = document.querySelector<HTMLButtonElement>("#download-drawio")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
 const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
+const savedMenu = document.querySelector<HTMLDetailsElement>("#saved-menu")!;
 let errorLine: number | undefined;
 const modeCompartment = new Compartment();
 const view = new EditorView({ parent: source, doc: "", extensions: [modeCompartment.of(editorExtensions())] });
@@ -74,6 +78,22 @@ function setErrorLine(line?: number): void {
     errorLine = line;
     gotoError.hidden = line === undefined;
     if (line !== undefined) gotoError.textContent = `Go to line ${line}`;
+}
+
+function setStatus(message: string, kind: "info" | "success" | "warning" | "error" = "info"): void {
+    status.textContent = message;
+    status.dataset.kind = kind;
+}
+
+function setPreviewStatus(message: string, kind: "info" | "success" | "warning" | "error" = "info"): void {
+    previewStatus.textContent = message;
+    previewStatus.dataset.kind = kind;
+}
+
+function setButtonLabel(button: HTMLButtonElement, label: string): void {
+    const content = button.querySelector<HTMLElement>(".button-label");
+    if (content) content.textContent = label;
+    else button.textContent = label;
 }
 
 function focusErrorLine(): void {
@@ -87,7 +107,9 @@ function focusErrorLine(): void {
 
 function reportError(error: unknown, stalePreview: boolean): void {
     const message = error instanceof Error ? error.message : String(error);
-    status.textContent = stalePreview && lastGoodXml ? `${message} (showing last successful preview)` : message;
+    setStatus(message, "error");
+    setPreviewStatus(stalePreview && lastGoodXml ? "Showing previous successful preview" : "Compilation failed", "warning");
+    if (!lastGoodXml) showPreviewFallback("Preview unavailable", "Fix the DSL error to render a diagram.");
     setErrorLine(error instanceof DslError ? error.line : undefined);
 }
 
@@ -169,7 +191,7 @@ function writeSavedDiagrams(diagrams: SavedDiagram[]): boolean {
         localStorage.setItem(savedDiagramsKey, JSON.stringify(diagrams));
         return true;
     } catch {
-        status.textContent = "Could not save diagram locally";
+        setStatus("Could not save diagram locally", "error");
         return false;
     }
 }
@@ -182,7 +204,15 @@ function setLoadedDiagram(diagram?: SavedDiagram): void {
     loadedDiagramId = diagram?.id;
     loadedDiagramName = diagram?.name;
     saveCurrent.disabled = !diagram;
-    savedCurrentStatus.textContent = diagram ? `Loaded: ${diagram.name}` : "Not saved";
+    savedCurrentStatus.textContent = diagram ? diagram.name : "Not saved";
+}
+
+function refreshLoadedStatus(): void {
+    if (!loadedDiagramId) {
+        savedCurrentStatus.textContent = "Not saved";
+        return;
+    }
+    savedCurrentStatus.textContent = currentSource() === savedSnapshot ? `Saved · ${loadedDiagramName}` : `Unsaved edits · ${loadedDiagramName}`;
 }
 
 function downloadFilename(extension: string): string {
@@ -211,12 +241,13 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     view.dispatch({ selection: { anchor: 0 } });
     view.scrollDOM.scrollTop = 0;
     view.scrollDOM.scrollLeft = 0;
-    xmlToggle.textContent = "🧾 Show draw.io XML";
+    savedMenu.open = false;
+    setButtonLabel(xmlToggle, "Show XML");
     scheduleShareUrl();
     updateEditor();
     renderSavedDiagrams();
     setErrorLine(undefined);
-    status.textContent = `Loaded ${diagram.name}`;
+    setStatus(`Loaded ${diagram.name}`, "success");
     markSourceChanged();
     void render();
 }
@@ -224,22 +255,24 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
 function renderSavedDiagrams(): void {
     const { diagrams, failed } = readSavedState();
     savedFailed = failed;
+    savedCount.textContent = String(diagrams.length);
     savedEmpty.hidden = failed || diagrams.length > 0;
     savedReset.hidden = !failed;
-    if (failed) status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+    if (failed) setStatus("Saved diagrams are unavailable or corrupt; stored data was preserved", "error");
     savedDiagramsList.replaceChildren(...diagrams.map((diagram) => {
         const item = document.createElement("div");
         item.className = `saved-item${diagram.id === loadedDiagramId ? " active" : ""}`;
         const load = document.createElement("button");
         load.className = "saved-load";
         load.type = "button";
-        load.textContent = `📂 ${diagram.name}`;
+        load.textContent = diagram.name;
         load.setAttribute("aria-current", String(diagram.id === loadedDiagramId));
         load.addEventListener("click", () => loadSavedDiagram(diagram));
         const remove = document.createElement("button");
         remove.className = "saved-delete";
         remove.type = "button";
-        remove.textContent = "🗑️ Delete";
+        remove.textContent = "Remove";
+        remove.setAttribute("aria-label", `Delete ${diagram.name}`);
         remove.addEventListener("click", () => {
             pendingDelete = diagram;
             deleteConfirmName.textContent = diagram.name;
@@ -248,6 +281,7 @@ function renderSavedDiagrams(): void {
         item.append(load, remove);
         return item;
     }));
+    refreshLoadedStatus();
 }
 
 async function syncShareUrl(snapshot: string, expectedRevision?: number): Promise<void> {
@@ -264,7 +298,7 @@ function scheduleShareUrl(): void {
 
 function updateEditor(): void {
     foldToggle.disabled = showingXml || !foldRegions.length;
-    foldToggle.textContent = view.dom.querySelector(".cm-foldPlaceholder") ? "Unfold all" : "Fold all";
+    setButtonLabel(foldToggle, view.dom.querySelector(".cm-foldPlaceholder") ? "Unfold all" : "Fold all");
 }
 
 function markSourceChanged(): void {
@@ -292,6 +326,7 @@ function showPreview(xml: string): void {
 async function render(): Promise<void> {
     const seen = sourceRevision;
     const src = showingXml ? dslSource : getEditorFull();
+    setPreviewStatus("Updating preview…");
     try {
         await routerReady;
         if (seen !== sourceRevision) return;
@@ -311,14 +346,16 @@ async function render(): Promise<void> {
             await viewerReady;
         } catch (viewerError) {
             if (seen !== sourceRevision) return;
-            showPreviewFallback();
-            status.textContent = viewerError instanceof Error ? viewerError.message : String(viewerError);
+            showPreviewFallback("Could not load diagram viewer", "Your diagram compiled. Open the XML view or download the .drawio file.");
+            setPreviewStatus("Viewer unavailable · XML is ready", "warning");
+            setStatus(viewerError instanceof Error ? viewerError.message : String(viewerError), "warning");
             return;
         }
         if (seen !== sourceRevision) return;
 
         showPreview(xml);
-        if (!savedFailed) status.textContent = "";
+        setPreviewStatus("Up to date", "success");
+        if (!savedFailed) setStatus("");
         setErrorLine(undefined);
     } catch (error) {
         if (seen !== sourceRevision) return;
@@ -329,11 +366,17 @@ async function render(): Promise<void> {
     }
 }
 
-function showPreviewFallback(): void {
-    // Viewer failed but compilation succeeded: keep valid XML accessible.
+function showPreviewFallback(titleText: string, messageText: string): void {
     const fallback = document.createElement("div");
-    fallback.className = "mxgraph";
-    fallback.textContent = "Preview unavailable; use Show draw.io XML.";
+    fallback.className = "preview-fallback";
+    const icon = document.createElement("span");
+    icon.className = "preview-fallback-icon";
+    icon.textContent = "!";
+    const title = document.createElement("strong");
+    title.textContent = titleText;
+    const message = document.createElement("span");
+    message.textContent = messageText;
+    fallback.append(icon, title, message);
     preview.replaceChildren(fallback);
 }
 
@@ -352,11 +395,11 @@ savedReset.addEventListener("click", () => {
     try {
         localStorage.removeItem(savedDiagramsKey);
     } catch {
-        status.textContent = "Could not clear saved diagrams";
+        setStatus("Could not clear saved diagrams", "error");
         return;
     }
     renderSavedDiagrams();
-    status.textContent = "Cleared saved diagrams";
+    setStatus("Saved diagrams cleared", "success");
 });
 window.addEventListener("storage", (event) => {
     if (event.key !== savedDiagramsKey) return;
@@ -364,12 +407,12 @@ window.addEventListener("storage", (event) => {
     renderSavedDiagrams();
     if (failed) return;
     if (isDirtyForLoad()) {
-        status.textContent = "Saved diagrams changed in another tab; your edits were kept";
+        setStatus("Saved diagrams changed in another tab; your edits were kept", "warning");
         return;
     }
     if (loadedDiagramId && !diagrams.some((diagram) => diagram.id === loadedDiagramId)) {
         setLoadedDiagram();
-        status.textContent = "Loaded diagram was deleted in another tab; your edits were kept";
+        setStatus("Loaded diagram was deleted in another tab; your edits were kept", "warning");
     }
 });
 deleteCancel.addEventListener("click", () => {
@@ -381,7 +424,7 @@ deleteAccept.addEventListener("click", () => {
     const deletedDiagram = pendingDelete;
     const { diagrams, failed } = readSavedState();
     if (failed) {
-        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+        setStatus("Saved diagrams are unavailable or corrupt; stored data was preserved", "error");
         return;
     }
     if (!writeSavedDiagrams(diagrams.filter((saved) => saved.id !== deletedDiagram.id))) {
@@ -393,8 +436,9 @@ deleteAccept.addEventListener("click", () => {
     }
     pendingDelete = undefined;
     deleteConfirm.close();
+    savedMenu.open = false;
     renderSavedDiagrams();
-    status.textContent = `Deleted ${deletedDiagram.name}`;
+    setStatus(`Deleted ${deletedDiagram.name}`, "success");
 });
 deleteConfirm.addEventListener("click", (event) => {
     if (event.target === deleteConfirm) {
@@ -406,14 +450,14 @@ saveCurrent.addEventListener("click", () => {
     if (!loadedDiagramId) return;
     const { diagrams, failed } = readSavedState();
     if (failed) {
-        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+        setStatus("Saved diagrams are unavailable or corrupt; stored data was preserved", "error");
         return;
     }
     const index = diagrams.findIndex((diagram) => diagram.id === loadedDiagramId);
     if (index < 0) {
         setLoadedDiagram();
         renderSavedDiagrams();
-        status.textContent = "Loaded diagram no longer exists";
+        setStatus("Loaded diagram no longer exists", "warning");
         return;
     }
     const diagram = { ...diagrams[index]!, source: dslSource };
@@ -421,7 +465,7 @@ saveCurrent.addEventListener("click", () => {
     if (!writeSavedDiagrams(diagrams)) return;
     savedSnapshot = diagram.source;
     renderSavedDiagrams();
-    status.textContent = `Saved ${diagram.name} locally`;
+    setStatus(`Saved ${diagram.name} locally`, "success");
 });
 saveCopy.addEventListener("click", () => {
     const diagram: SavedDiagram = {
@@ -431,7 +475,7 @@ saveCopy.addEventListener("click", () => {
     };
     const { diagrams, failed } = readSavedState();
     if (failed) {
-        status.textContent = "Saved diagrams are unavailable or corrupt; stored data was preserved";
+        setStatus("Saved diagrams are unavailable or corrupt; stored data was preserved", "error");
         return;
     }
     if (!writeSavedDiagrams([diagram, ...diagrams])) return;
@@ -439,7 +483,7 @@ saveCopy.addEventListener("click", () => {
     savedSnapshot = diagram.source;
     saveName.value = "";
     renderSavedDiagrams();
-    status.textContent = `Saved ${diagram.name} locally`;
+    setStatus(`Saved ${diagram.name} locally`, "success");
 });
 guideToggle.addEventListener("click", () => guide.showModal());
 guideClose.addEventListener("click", () => guide.close());
@@ -454,10 +498,10 @@ skill.addEventListener("click", (event) => {
 copySkill.addEventListener("click", async () => {
     try {
         await navigator.clipboard.writeText(skillSource.textContent ?? "");
-        copySkill.textContent = "✅ Copied!";
-        setTimeout(() => { copySkill.textContent = "📋 Copy"; }, 1200);
+        setButtonLabel(copySkill, "Copied");
+        setTimeout(() => { setButtonLabel(copySkill, "Copy skill"); }, 1200);
     } catch {
-        copySkill.textContent = "Clipboard denied";
+        setButtonLabel(copySkill, "Clipboard denied");
     }
 });
 formatDslButton.addEventListener("click", () => {
@@ -470,8 +514,8 @@ formatDslButton.addEventListener("click", () => {
         scheduleShareUrl();
         updateEditor();
         setEditorMode();
-        xmlToggle.textContent = "🧾 Show draw.io XML";
-        status.textContent = "Formatted successfully";
+        setButtonLabel(xmlToggle, "Show XML");
+        setStatus("Formatted successfully", "success");
         setErrorLine(undefined);
         markSourceChanged();
         void render();
@@ -481,8 +525,13 @@ formatDslButton.addEventListener("click", () => {
 });
 gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
-    source.setAttribute("aria-label", showingXml ? "draw.io XML output (read-only)" : "DrawDSL source");
-    view.dispatch({ effects: modeCompartment.reconfigure(editorExtensions(showingXml)) });
+    const label = showingXml ? "draw.io XML output (read-only)" : "DrawDSL source";
+    source.setAttribute("aria-label", label);
+    sourceMode.textContent = showingXml ? "XML · Read only" : "DrawDSL";
+    sourceMode.classList.toggle("read-only", showingXml);
+    xmlToggle.setAttribute("aria-label", showingXml ? "Switch editor to DrawDSL" : "Switch editor to draw.io XML");
+    setButtonLabel(xmlToggle, showingXml ? "Show DSL" : "Show XML");
+    view.dispatch({ effects: modeCompartment.reconfigure(editorExtensions(showingXml, darkMode)) });
 }
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
@@ -491,11 +540,9 @@ xmlToggle.addEventListener("click", () => {
         dslSource = getEditorFull();
         view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: latestXml } });
         updateEditor();
-        xmlToggle.textContent = "📝 Show DSL";
     } else {
         setEditorText(dslSource);
         updateEditor();
-        xmlToggle.textContent = "🧾 Show draw.io XML";
     }
     setEditorMode();
 });
@@ -521,10 +568,10 @@ copyXml.addEventListener("click", async () => {
     if (currentSource() !== lastGoodSource) return;
     try {
         await navigator.clipboard.writeText(latestXml);
-        copyXml.textContent = "✅ Copied!";
-        setTimeout(() => { copyXml.textContent = "📋 Copy draw.io XML"; }, 1200);
+        setButtonLabel(copyXml, "Copied");
+        setTimeout(() => { setButtonLabel(copyXml, "Copy draw.io XML"); }, 1200);
     } catch {
-        status.textContent = "Clipboard access was denied";
+        setStatus("Clipboard access was denied", "error");
     }
 });
 downloadDsl.addEventListener("click", () => {
@@ -542,17 +589,18 @@ copyShareLink.addEventListener("click", async () => {
         await syncShareUrl(snapshot, revision);
         if (revision !== shareRevision) return;
         await navigator.clipboard.writeText(location.href);
-        copyShareLink.textContent = "✅ Copied!";
-        setTimeout(() => { copyShareLink.textContent = "🔗 Copy share link"; }, 1200);
+        setButtonLabel(copyShareLink, "Link copied");
+        setTimeout(() => { setButtonLabel(copyShareLink, "Share"); }, 1200);
     } catch {
-        status.textContent = "Clipboard access was denied";
+        setStatus("Clipboard access was denied", "error");
     }
 });
 themeToggle.addEventListener("click", () => {
     darkMode = !darkMode;
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
-    themeToggle.textContent = darkMode ? "☀️ Light mode" : "🌙 Dark mode";
+    setButtonLabel(themeToggle, darkMode ? "Light theme" : "Dark theme");
     themeToggle.setAttribute("aria-pressed", String(darkMode));
+    setEditorMode();
     if (lastGoodXml) showPreview(lastGoodXml);
 });
 view.dom.addEventListener("click", () => updateEditor());
@@ -561,6 +609,8 @@ view.dom.addEventListener("input", () => {
     editorFull = editorText();
     foldRegions = computeFoldRegions(editorFull);
     dslSource = editorFull;
+    refreshLoadedStatus();
+    setPreviewStatus("Changes pending…");
     markSourceChanged();
     scheduleShareUrl();
     updateEditor();
@@ -587,9 +637,9 @@ void (async () => {
         }
     } else if (error) {
         initialError = error;
-        status.textContent = initialError;
+        setStatus(initialError, "warning");
     }
     updateEditor();
     await render();
-    if (initialError && !status.textContent) status.textContent = initialError;
+    if (initialError) setStatus(initialError, "warning");
 })();

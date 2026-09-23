@@ -8,46 +8,54 @@
     <script type="module" src="/src/web.ts"></script>
 </head>
 <body>
-    <header>
-        <h1><a href="./" title="Reset to the starter diagram">DrawDSL</a></h1>
-        <span>Architecture diagrams from text</span>
+    <header class="app-header">
+        <div class="brand-lockup">
+            <a class="brand-mark" href="./" title="Reset to the starter diagram" aria-label="DrawDSL home">D</a>
+            <div><h1><a href="./" title="Reset to the starter diagram">DrawDSL</a></h1><p>Architecture workbench</p></div>
+        </div>
         <div class="header-actions">
-            <button id="guide-toggle" type="button">📖 DSL guide</button>
-            <button id="skill-toggle" type="button">SKILL.md</button>
+            <details id="help-menu" class="menu-disclosure">
+                <summary aria-label="Help"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M8 7.5a2.1 2.1 0 1 1 3.6 1.5c-1 .9-1.6 1.1-1.6 2.5M10 14.3h.01"/></svg><span>Help</span></summary>
+                <div class="menu-panel help-panel"><button id="guide-toggle" type="button">DSL guide</button><button id="skill-toggle" type="button">Authoring skill</button></div>
+            </details>
             <a id="repo-link" href="https://github.com/joetancy/drawdsl" target="_blank" rel="noreferrer">GitHub</a>
-            <button id="theme-toggle" type="button" aria-pressed="false">🌙 Dark mode</button>
+            <button id="theme-toggle" class="icon-button theme-button" type="button" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.4"/><path d="M10 1.8v2m0 12.4v2M1.8 10h2m12.4 0h2M4.2 4.2l1.4 1.4m8.8 8.8 1.4 1.4m0-11.6-1.4 1.4m-8.8 8.8-1.4 1.4"/></svg><span class="button-label">Dark theme</span></button>
         </div>
     </header>
-    <nav class="saved-bar" aria-label="Saved diagrams">
-        <strong>💾 Saved</strong>
-        <input id="save-name" type="text" maxlength="80" placeholder="Diagram name" aria-label="Diagram name">
-        <button id="save-current" type="button" disabled>💾 Save</button>
-        <button id="save-copy" type="button">📄 Save copy</button>
-        <span id="saved-current-status" class="saved-current-status" aria-live="polite">Not saved</span>
-        <div id="saved-diagrams-list" aria-live="polite"></div>
-        <span id="saved-empty">No saved diagrams yet.</span>
-        <button id="saved-reset" type="button" hidden>Reset saved data</button>
+    <nav class="document-toolbar" aria-label="Diagram actions">
+        <details id="saved-menu" class="menu-disclosure saved-disclosure">
+            <summary><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5h5l1.5 1.7H17v9.3H3z"/><path d="M3 7h14"/></svg><span>Saved</span><span id="saved-current-status" class="saved-current-status" aria-live="polite">Not saved</span><span id="saved-count" class="count-badge">0</span></summary>
+            <div class="menu-panel saved-panel">
+                <div class="saved-panel-heading"><strong>Saved diagrams</strong><span>Stored in this browser</span></div>
+                <div class="save-controls"><label class="visually-hidden" for="save-name">Diagram name</label><input id="save-name" type="text" maxlength="80" placeholder="Name this diagram"><button id="save-current" type="button" disabled>Save</button><button id="save-copy" class="button-secondary" type="button">Save copy</button></div>
+                <div id="saved-diagrams-list" class="saved-diagrams-list" aria-live="polite"></div>
+                <span id="saved-empty" class="empty-saved">No saved diagrams yet.</span>
+                <button id="saved-reset" class="button-secondary" type="button" hidden>Reset saved data</button>
+            </div>
+        </details>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button id="copy-share-link" class="toolbar-button" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="2.2"/><circle cx="15" cy="5" r="2.2"/><circle cx="15" cy="15" r="2.2"/><path d="m7 9 5.8-3M7 11l5.8 3"/></svg><span class="button-label">Share</span></button>
+        <details id="export-menu" class="menu-disclosure export-disclosure">
+            <summary><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m-4-4 4 4 4-4M3.5 14v3h13v-3"/></svg><span>Export</span></summary>
+            <div class="menu-panel export-panel"><button id="copy-xml" type="button" disabled>Copy draw.io XML</button><button id="download-dsl" type="button">Download .drawdsl</button><button id="download-drawio" class="export-primary" type="button" disabled>Download .drawio</button></div>
+        </details>
     </nav>
     <main>
-        <section class="editor-pane">
-            <div class="editor-toolbar">
-                <label for="source">DSL</label>
+        <section class="editor-pane" aria-label="Source editor">
+            <div class="panel-header editor-heading">
+                <div class="panel-title"><span class="panel-icon code-icon" aria-hidden="true">&lt;/&gt;</span><div><h2>Source</h2><span id="source-mode" class="mode-label">DrawDSL</span></div></div>
                 <div class="editor-actions">
-                    <button id="fold-toggle" type="button">Fold all</button>
-                    <button id="format-dsl" type="button">✨ Format DrawDSL</button>
-                    <button id="copy-share-link" type="button">🔗 Copy share link</button>
-                    <button id="xml-toggle" type="button" disabled>🧾 Show draw.io XML</button>
-                    <button id="copy-xml" type="button" disabled>📋 Copy draw.io XML</button>
-                    <button id="download-dsl" type="button">⬇️ Download .drawdsl</button>
-                    <button id="download-drawio" type="button" disabled>⬇️ Download .drawio</button>
+                    <button id="fold-toggle" class="toolbar-button" type="button" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4M3 4h14M3 16h14"/></svg><span class="button-label">Fold all</span></button>
+                    <button id="format-dsl" class="toolbar-button" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h14M14 8l3 2-3 2"/></svg><span>Format</span></button>
+                    <button id="xml-toggle" class="toolbar-button" type="button" disabled aria-label="Switch editor to draw.io XML"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 5-5 5 5 5m6-10 5 5-5 5m-2-12-2 14"/></svg><span class="button-label">Show XML</span></button>
                 </div>
             </div>
             <div id="source" class="editor-input" aria-label="DrawDSL source"></div>
-            <output id="status" aria-live="polite"></output>
-            <button id="goto-error" type="button" hidden>Go to error line</button>
+            <div class="editor-feedback"><output id="status" aria-live="polite" data-kind="info"></output><button id="goto-error" type="button" hidden>Go to error</button></div>
         </section>
         <section class="preview-pane" aria-label="Diagram preview">
-            <div id="preview"><span>Rendering…</span></div>
+            <div class="panel-header preview-heading"><div class="panel-title"><span class="panel-icon preview-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1"/><rect x="11.5" y="11.5" width="6" height="6" rx="1"/><path d="M8.5 5.5h2a1 1 0 0 1 1 1v5"/></svg></span><div><h2>Diagram preview</h2><span id="preview-status" class="preview-status" aria-live="polite">Rendering…</span></div></div></div>
+            <div id="preview"><div class="preview-loading"><span class="loading-spinner" aria-hidden="true"></span><span>Preparing diagram…</span></div></div>
         </section>
     </main>
     <dialog id="delete-confirm" aria-labelledby="delete-confirm-title">
@@ -65,7 +73,7 @@
             <div class="guide-heading">
                 <h2 id="skill-title">DrawDSL skill</h2>
                 <div class="skill-actions">
-                    <button id="copy-skill" class="guide-close" type="button">📋 Copy</button>
+                    <button id="copy-skill" class="guide-close" type="button"><span class="button-label">Copy skill</span></button>
                     <button id="skill-close" class="guide-close" type="button">Close</button>
                 </div>
             </div>

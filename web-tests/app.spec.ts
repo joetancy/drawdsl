@@ -34,6 +34,11 @@ async function ready(page: Page): Promise<void> {
     await expect(page.locator("#copy-xml")).toBeEnabled({ timeout: 30_000 });
 }
 
+async function openMenu(page: Page, id: string): Promise<void> {
+    const details = page.locator(`#${id}`);
+    if (!await details.evaluate((element) => (element as HTMLDetailsElement).open)) await details.locator(":scope > summary").click();
+}
+
 test("compile failure disables export and recovery re-enables it", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);
@@ -88,6 +93,8 @@ test("save, load, and delete flow with empty state and active styling", async ({
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    await openMenu(page, "saved-menu");
+    await expect(page.locator("#saved-reset")).toBeHidden();
     await page.fill("#save-name", "P08 diagram");
     await page.click("#save-copy");
     await expect(page.locator("#saved-diagrams-list .saved-item.active")).toContainText("P08 diagram");
@@ -102,8 +109,10 @@ test("save, load, and delete flow with empty state and active styling", async ({
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator("#saved-diagrams-list .saved-load").click();
     await expect(page.locator("#source .cm-content")).not.toContainText(/# dirty/);
+    await openMenu(page, "saved-menu");
     await page.locator("#saved-diagrams-list .saved-delete").click();
     await page.click("#delete-accept");
+    await openMenu(page, "saved-menu");
     await expect(page.locator("#saved-empty")).toBeVisible();
 });
 
@@ -115,6 +124,7 @@ test("corrupt storage reports a recoverable error", async ({ page }) => {
     await page.evaluate(() => localStorage.setItem("drawdsl.saved-diagrams.v1", "{corrupt"));
     await page.reload();
     await expect(page.locator("#status")).toContainText(/unavailable or corrupt/, { timeout: 15_000 });
+    await openMenu(page, "saved-menu");
     await expect(page.locator("#saved-reset")).toBeVisible();
     page.once("dialog", (dialog) => void dialog.accept());
     await page.click("#saved-reset");
@@ -140,6 +150,16 @@ test("viewer failure keeps xml available", async ({ page }) => {
     await expect(page.locator("#xml-toggle")).toBeEnabled();
     await page.click("#xml-toggle");
     await expect(page.locator("#source .cm-content")).toContainText(/mxfile/, { timeout: 15_000 });
+    await expect(page.locator("#preview")).toContainText(/Your diagram compiled/);
+});
+
+test("invalid initial source shows an actionable empty-preview state", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./#dsl=this%20is%20not%20valid");
+    await expect(page.locator("#status")).not.toBeEmpty({ timeout: 15_000 });
+    await expect(page.locator("#preview")).toContainText("Fix the DSL error to render a diagram.");
+    await expect(page.locator("#preview-status")).toContainText("Compilation failed");
 });
 
 test("clipboard denial reports an error", async ({ page }) => {
@@ -152,6 +172,7 @@ test("clipboard denial reports an error", async ({ page }) => {
     });
     await page.goto("./");
     await ready(page);
+    await openMenu(page, "export-menu");
     await page.click("#copy-xml");
     await expect(page.locator("#status")).toContainText(/denied/, { timeout: 15_000 });
 });
@@ -169,7 +190,7 @@ test("keyboard can leave the editor in both directions", async ({ page }) => {
     await page.keyboard.press("Escape");
     await expect(page.locator("#format-dsl")).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(page.locator("#copy-share-link")).toBeFocused();
+    await expect(page.locator("#xml-toggle")).toBeFocused();
 });
 
 test("narrow viewport keeps essential controls reachable", async ({ page }) => {
@@ -178,11 +199,15 @@ test("narrow viewport keeps essential controls reachable", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    await openMenu(page, "export-menu");
+    await openMenu(page, "saved-menu");
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth).toBeLessThanOrEqual(361);
     for (const id of ["#format-dsl", "#copy-share-link", "#xml-toggle", "#copy-xml", "#save-copy", "#theme-toggle"]) {
         await expect(page.locator(id)).toBeVisible();
     }
+    const menuBox = await page.locator("#saved-menu .menu-panel").boundingBox();
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(360);
 });
 
 test("repo link points at the project", async ({ page }) => {
@@ -259,6 +284,7 @@ test("downloads match current source and xml, and stale xml cannot download", as
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    await openMenu(page, "export-menu");
     const dslDownload = page.waitForEvent("download");
     await page.click("#download-dsl");
     const dslPath = await (await dslDownload).path();
@@ -275,4 +301,30 @@ test("downloads match current source and xml, and stale xml cannot download", as
     await page.locator("#source .cm-content").fill("bogus syntax {{{");
     await expect(page.locator("#status")).not.toBeEmpty({ timeout: 15_000 });
     await expect(page.locator("#download-drawio")).toBeDisabled();
+});
+
+test("workbench disclosures, theme, dialog, and preview status stay in sync", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await expect(page.locator("#preview-status")).toContainText("Up to date");
+    await page.locator("#source .cm-content").fill("not valid syntax");
+    await expect(page.locator("#status")).toHaveAttribute("data-kind", "error", { timeout: 15_000 });
+    await expect(page.locator("#preview-status")).toContainText("previous successful preview");
+
+    await openMenu(page, "help-menu");
+    await page.click("#guide-toggle");
+    await expect(page.locator("#guide")).toBeVisible();
+    await expect(page.locator("#guide")).toContainText("background=primary");
+    await page.click("#guide-close");
+    await expect(page.locator("#guide")).toBeHidden();
+    await expect(page.locator("#guide-toggle")).toBeFocused();
+
+    await page.click("#theme-toggle");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    const editorColor = await page.locator("#source .cm-content").evaluate((element) => getComputedStyle(element).color);
+    expect(editorColor).not.toBe("rgb(23, 43, 77)");
+    await page.click("#theme-toggle");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", "dark");
 });
