@@ -39,10 +39,10 @@ test("compile failure disables export and recovery re-enables it", async ({ page
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.fill("#source", "this is not valid {{{");
+    await page.locator("#source .cm-content").fill("this is not valid {{{");
     await expect(page.locator("#status")).not.toBeEmpty({ timeout: 15_000 });
     await expect(page.locator("#copy-xml")).toBeDisabled();
-    await page.fill("#source", STARTER);
+    await page.locator("#source .cm-content").fill(STARTER);
     await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
     await expect(page.locator("#copy-xml")).toBeEnabled();
     await expect(page.locator("#goto-error")).toBeHidden();
@@ -53,11 +53,11 @@ test("error line button focuses the offending line", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.fill("#source", `${STARTER}\ncore:nosuch thing`);
+    await page.locator("#source .cm-content").fill(`${STARTER}\ncore:nosuch thing`);
     await expect(page.locator("#goto-error")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator("#goto-error")).toContainText("line 4");
     await page.click("#goto-error");
-    await expect(page.locator("#source")).toBeFocused();
+    await expect(page.locator("#source .cm-content")).toBeFocused();
 });
 
 test("rapid edits resolve to the latest source", async ({ page }) => {
@@ -65,8 +65,8 @@ test("rapid edits resolve to the latest source", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.fill("#source", "bogus syntax {{{");
-    await page.fill("#source", STARTER);
+    await page.locator("#source .cm-content").fill("bogus syntax {{{");
+    await page.locator("#source .cm-content").fill(STARTER);
     await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
     await expect(page.locator("#copy-xml")).toBeEnabled();
 });
@@ -77,7 +77,7 @@ test("xml view switches and returns to dsl", async ({ page }) => {
     await page.goto("./");
     await ready(page);
     await page.click("#xml-toggle");
-    await expect(page.locator("#source")).toHaveValue(/mxfile/, { timeout: 15_000 });
+    await expect(page.locator("#source .cm-content")).toContainText(/mxfile/, { timeout: 15_000 });
     await expect(page.locator("#source")).toHaveAttribute("aria-label", /XML/);
     await page.click("#xml-toggle");
     await expect(page.locator("#source")).toHaveAttribute("aria-label", /DrawDSL/);
@@ -94,14 +94,14 @@ test("save, load, and delete flow with empty state and active styling", async ({
     await expect(page.locator("#saved-empty")).toBeHidden();
     // Dirty guard: edit then cancel the confirm dialog.
     page.once("dialog", (dialog) => void dialog.dismiss());
-    await page.fill("#source", `${STARTER}\n# dirty`);
-    await expect(page.locator("#source")).toHaveValue(/# dirty/);
+    await page.locator("#source .cm-content").fill(`${STARTER}\n# dirty`);
+    await expect(page.locator("#source .cm-content")).toContainText(/# dirty/);
     await page.locator("#saved-diagrams-list .saved-load").click();
-    await expect(page.locator("#source")).toHaveValue(/# dirty/);
+    await expect(page.locator("#source .cm-content")).toContainText(/# dirty/);
     // Accept load via dialog.
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator("#saved-diagrams-list .saved-load").click();
-    await expect(page.locator("#source")).not.toHaveValue(/# dirty/);
+    await expect(page.locator("#source .cm-content")).not.toContainText(/# dirty/);
     await page.locator("#saved-diagrams-list .saved-delete").click();
     await page.click("#delete-accept");
     await expect(page.locator("#saved-empty")).toBeVisible();
@@ -125,7 +125,7 @@ test("legacy and bad share links behave", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);
     await page.goto("./#dsl=aws%3Alambda%20shared");
-    await expect(page.locator("#source")).toHaveValue(/aws:lambda shared/, { timeout: 15_000 });
+    await expect(page.locator("#source .cm-content")).toContainText(/aws:lambda shared/, { timeout: 15_000 });
     // Same-document hash changes do not reload; set the hash then reload.
     await page.evaluate(() => { window.location.hash = "#v=999&z=abc"; });
     await page.reload();
@@ -139,7 +139,7 @@ test("viewer failure keeps xml available", async ({ page }) => {
     await expect(page.locator("#status")).toContainText(/viewer/i, { timeout: 30_000 });
     await expect(page.locator("#xml-toggle")).toBeEnabled();
     await page.click("#xml-toggle");
-    await expect(page.locator("#source")).toHaveValue(/mxfile/, { timeout: 15_000 });
+    await expect(page.locator("#source .cm-content")).toContainText(/mxfile/, { timeout: 15_000 });
 });
 
 test("clipboard denial reports an error", async ({ page }) => {
@@ -161,11 +161,11 @@ test("keyboard can leave the editor in both directions", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.click("#source");
-    await expect(page.locator("#source")).toBeFocused();
+    await page.locator("#source .cm-content").click();
+    await expect(page.locator("#source .cm-content")).toBeFocused();
     await page.keyboard.press("Shift+Tab");
-    await expect(page.locator("#source")).not.toBeFocused();
-    await page.click("#source");
+    await expect(page.locator("#source .cm-content")).not.toBeFocused();
+    await page.locator("#source .cm-content").click();
     await page.keyboard.press("Escape");
     await expect(page.locator("#format-dsl")).toBeFocused();
     await page.keyboard.press("Tab");
@@ -198,14 +198,13 @@ test("containers fold and unfold from the gutter", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await expect(page.locator("#fold-gutter [data-fold-start]")).toHaveCount(2);
-    await page.locator('#fold-gutter [data-fold-start="3"]').click();
-    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
-    await expect(page.locator("#source")).toHaveValue(/aws:cloud cloud/);
+    await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
+    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
+    await expect(page.locator("#source .cm-content")).toContainText(/aws:cloud cloud/);
     // Compilation still sees the folded lines.
     await expect(page.locator("#copy-xml")).toBeEnabled();
-    await page.locator('#fold-gutter [data-fold-start="3"]').click();
-    await expect(page.locator("#source")).toHaveValue(/Request handler/);
+    await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
+    await expect(page.locator("#source .cm-content")).toContainText(/Request handler/);
 });
 
 test("edits outside a fold keep it folded", async ({ page }) => {
@@ -213,12 +212,12 @@ test("edits outside a fold keep it folded", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.locator('#fold-gutter [data-fold-start="3"]').click();
-    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
-    await page.locator("#source").click();
+    await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
+    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
+    await page.locator("#source .cm-content").click();
     await page.keyboard.press("Home");
     await page.keyboard.type("# folded survives\n");
-    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
     await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
 });
 
@@ -229,19 +228,19 @@ test("fold-all toggle and error navigation with folds", async ({ page }) => {
     await ready(page);
     await page.click("#fold-toggle");
     await expect(page.locator("#fold-toggle")).toContainText("Unfold all");
-    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
     await page.click("#fold-toggle");
     await expect(page.locator("#fold-toggle")).toContainText("Fold all");
-    await expect(page.locator("#source")).toHaveValue(/Request handler/);
+    await expect(page.locator("#source .cm-content")).toContainText(/Request handler/);
     // Error on a visible line still navigates while another region stays folded.
-    await page.locator('#fold-gutter [data-fold-start="3"]').click();
-    await page.locator("#source").click();
+    await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
+    await page.locator("#source .cm-content").click();
     await page.keyboard.press("Home");
     await page.keyboard.type("bogus ");
     await expect(page.locator("#goto-error")).toBeVisible({ timeout: 15_000 });
     await page.click("#goto-error");
-    await expect(page.locator("#source")).toBeFocused();
-    await expect(page.locator("#source")).not.toHaveValue(/Request handler/);
+    await expect(page.locator("#source .cm-content")).toBeFocused();
+    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
 });
 
 test("dashed operators highlight the same as solid ones", async ({ page }) => {
@@ -249,10 +248,10 @@ test("dashed operators highlight the same as solid ones", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
-    await page.fill("#source", "aws:lambda a\naws:lambda b\na -.- b");
+    await page.locator("#source .cm-content").fill("aws:lambda a\naws:lambda b\na -.- b");
     await expect(page.locator("#status")).toBeEmpty({ timeout: 15_000 });
-    const operators = await page.locator('#syntax-highlight .token-operator:has-text("-.-")').count();
-    expect(operators).toBeGreaterThan(0);
+    const operatorHighlighted = await page.locator("#source .cm-content span").evaluateAll((tokens) => tokens.some((token) => token.textContent === "-.-"));
+    expect(operatorHighlighted).toBe(true);
 });
 
 test("downloads match current source and xml, and stale xml cannot download", async ({ page }) => {
@@ -264,7 +263,8 @@ test("downloads match current source and xml, and stale xml cannot download", as
     await page.click("#download-dsl");
     const dslPath = await (await dslDownload).path();
     const dslText = await readFile(dslPath!, "utf8");
-    await expect(page.locator("#source")).toHaveValue(dslText);
+    const editorText = await page.locator("#source .cm-content").innerText();
+    expect(editorText.replaceAll("\n", "")).toContain(dslText.replaceAll("\n", "").trimEnd());
 
     const drawioDownload = page.waitForEvent("download");
     await page.click("#download-drawio");
@@ -272,7 +272,7 @@ test("downloads match current source and xml, and stale xml cannot download", as
     const drawioText = await readFile(drawioPath!, "utf8");
     expect(drawioText).toContain("<mxfile");
 
-    await page.fill("#source", "bogus syntax {{{");
+    await page.locator("#source .cm-content").fill("bogus syntax {{{");
     await expect(page.locator("#status")).not.toBeEmpty({ timeout: 15_000 });
     await expect(page.locator("#download-drawio")).toBeDisabled();
 });

@@ -338,7 +338,15 @@ function conflictScore(paths: RoutePath[], edgeSpacing: number): number {
     let score = 0;
     for (let first = 0; first < segments.length; first += 1) {
         for (let second = first + 1; second < segments.length; second += 1) {
-            if (segments[first]!.path !== segments[second]!.path && tooClose(segments[first]!, segments[second]!, edgeSpacing)) score += 2;
+            const a = segments[first]!;
+            const b = segments[second]!;
+            if (a.path === b.path || !tooClose(a, b, edgeSpacing)) continue;
+            const aStart = a.horizontal ? a.start.x : a.start.y;
+            const aEnd = a.horizontal ? a.end.x : a.end.y;
+            const bStart = b.horizontal ? b.start.x : b.start.y;
+            const bEnd = b.horizontal ? b.end.x : b.end.y;
+            const distance = a.horizontal ? Math.abs(a.start.y - b.start.y) : Math.abs(a.start.x - b.start.x);
+            score += overlapLength(aStart, aEnd, bStart, bEnd) * (edgeSpacing - distance) / edgeSpacing;
         }
     }
     return score;

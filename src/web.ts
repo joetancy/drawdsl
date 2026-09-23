@@ -6,16 +6,11 @@ import { parseDsl } from "./parser.js";
 import { formatDsl } from "./formatter.js";
 import { buildShareHash, resolveShareDsl } from "./share.js";
 import { DslError } from "./model.js";
-import {
-    applyFolds,
-    computeFoldRegions,
-    lineColToOffset,
-    mergeDisplayEdit,
-    offsetToLineCol,
-    remapFolds,
-    type FoldMaps,
-    type FoldRegion,
-} from "./fold.js";
+import { computeFoldRegions, type FoldRegion } from "./fold.js";
+import { foldAll, foldEffect, unfoldAll, unfoldEffect } from "@codemirror/language";
+import { Compartment } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { editorExtensions } from "./editor.js";
 
 declare global {
     interface Window {
@@ -39,12 +34,8 @@ api --> handler
 handler --> data
 `;
 
-const source = document.querySelector<HTMLTextAreaElement>("#source")!;
-const editorInput = document.querySelector<HTMLDivElement>(".editor-input")!;
-const foldGutter = document.querySelector<HTMLDivElement>("#fold-gutter")!;
+const source = document.querySelector<HTMLDivElement>("#source")!;
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
-const lineNumbers = document.querySelector<HTMLPreElement>("#line-numbers")!;
-const syntaxHighlight = document.querySelector<HTMLPreElement>("#syntax-highlight")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
@@ -75,6 +66,9 @@ const downloadDrawio = document.querySelector<HTMLButtonElement>("#download-draw
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
 const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
 let errorLine: number | undefined;
+const modeCompartment = new Compartment();
+const view = new EditorView({ parent: source, doc: "", extensions: [modeCompartment.of(editorExtensions())] });
+const editorText = (): string => view.state.doc.toString();
 
 function setErrorLine(line?: number): void {
     errorLine = line;
@@ -85,11 +79,9 @@ function setErrorLine(line?: number): void {
 function focusErrorLine(): void {
     if (errorLine === undefined || showingXml) return;
     ensureLineVisible(errorLine - 1);
-    const displayed = foldMaps.fullToDisplay[errorLine - 1] ?? 0;
-    const lines = source.value.split("\n");
-    const offset = lineColToOffset(lines, displayed, 0);
-    source.focus();
-    source.setSelectionRange(offset, offset);
+    const line = view.state.doc.line(Math.min(errorLine, view.state.doc.lines));
+    view.focus();
+    view.dispatch({ selection: { anchor: line.from } });
     updateEditor();
 }
 
@@ -101,91 +93,21 @@ function reportError(error: unknown, stalePreview: boolean): void {
 
 let editorFull = "";
 let foldRegions: FoldRegion[] = [];
-let foldedStarts = new Set<number>();
-let foldMaps: FoldMaps = { displayToFull: [], fullToDisplay: [] };
-let lastDisplay = "";
-
-// The textarea shows the folded view; editorFull is the complete diagram source.
-function displaySelectionToFull(start: number, end: number): [number, number] {
-    const displayLines = source.value.split("\n");
-    const fullLines = editorFull.split("\n");
-    const toFull = (offset: number): number => {
-        const { line, col } = offsetToLineCol(displayLines, offset);
-        return lineColToOffset(fullLines, foldMaps.displayToFull[line] ?? 0, col);
-    };
-    return [toFull(start), toFull(end)];
-}
-
-function fullSelectionToDisplay(start: number, end: number): [number, number] {
-    const fullLines = editorFull.split("\n");
-    const displayLines = source.value.split("\n");
-    const toDisplay = (offset: number): number => {
-        const { line, col } = offsetToLineCol(fullLines, offset);
-        const visible = foldMaps.fullToDisplay[line];
-        if (visible !== undefined) return lineColToOffset(displayLines, visible, col);
-        const region = foldRegions.find((candidate) => candidate.start < line && line <= candidate.end && foldedStarts.has(candidate.start));
-        const opener = region ? foldMaps.fullToDisplay[region.start] ?? 0 : 0;
-        return lineColToOffset(displayLines, opener, displayLines[opener]?.length ?? 0);
-    };
-    return [toDisplay(start), toDisplay(end)];
-}
-
-function renderFoldedView(selFull?: [number, number]): void {
-    const keep = selFull ?? displaySelectionToFull(source.selectionStart, source.selectionEnd);
-    const { text, maps } = applyFolds(editorFull, foldRegions, foldedStarts);
-    foldMaps = maps;
-    lastDisplay = text;
-    if (source.value !== text) source.value = text;
-    const [start, end] = fullSelectionToDisplay(keep[0], keep[1]);
-    source.setSelectionRange(start, end);
-}
-
-function syncEditorFromDisplay(): void {
-    const newDisplay = source.value;
-    if (newDisplay === lastDisplay) return;
-    const merge = mergeDisplayEdit(editorFull, foldMaps.displayToFull, lastDisplay, newDisplay);
-    editorFull = merge.full;
-    const oldRegions = foldRegions;
-    foldRegions = computeFoldRegions(editorFull);
-    foldedStarts = remapFolds(oldRegions, foldedStarts, merge.fullStart, merge.fullEnd, merge.insertedCount, foldRegions);
-    const newDisplayLines = newDisplay.split("\n");
-    const fullLines = editorFull.split("\n");
-    const toFull = (offset: number): number => {
-        const { line, col } = offsetToLineCol(newDisplayLines, offset);
-        return lineColToOffset(fullLines, merge.newDisplayToFull[line] ?? 0, col);
-    };
-    renderFoldedView([toFull(source.selectionStart), toFull(source.selectionEnd)]);
-}
 
 function getEditorFull(): string {
-    if (!showingXml && source.value !== lastDisplay) syncEditorFromDisplay();
-    return editorFull;
+    return editorText();
 }
 
 function setEditorText(full: string): void {
     editorFull = full;
     foldRegions = computeFoldRegions(full);
-    foldedStarts = new Set<number>();
-    renderFoldedView([0, 0]);
-}
-
-function toggleFold(fullStart: number): void {
-    if (foldedStarts.has(fullStart)) foldedStarts.delete(fullStart);
-    else foldedStarts.add(fullStart);
-    renderFoldedView();
-    updateEditor();
-    source.focus();
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: full }, selection: { anchor: 0 } });
+    unfoldAll(view);
 }
 
 function ensureLineVisible(fullLine: number): void {
-    let changed = false;
-    for (const region of foldRegions) {
-        if (region.start < fullLine && fullLine <= region.end && foldedStarts.delete(region.start)) changed = true;
-    }
-    if (changed) {
-        renderFoldedView();
-        updateEditor();
-    }
+    const region = foldRegions.find((candidate) => candidate.start < fullLine && fullLine <= candidate.end);
+    if (region) view.dispatch({ effects: unfoldEffect.of({ from: view.state.doc.line(region.start + 1).to, to: view.state.doc.line(region.end + 1).to }) });
 }
 const routerReady = initRouter(new URL("../node_modules/libavoid-js/dist/libavoid.wasm", import.meta.url).href);
 routerReady.catch(() => {});
@@ -286,9 +208,9 @@ function loadSavedDiagram(diagram: SavedDiagram): void {
     showingXml = false;
     dslSource = diagram.source;
     setEditorText(diagram.source);
-    source.setSelectionRange(0, 0);
-    source.scrollTop = 0;
-    source.scrollLeft = 0;
+    view.dispatch({ selection: { anchor: 0 } });
+    view.scrollDOM.scrollTop = 0;
+    view.scrollDOM.scrollLeft = 0;
     xmlToggle.textContent = "🧾 Show draw.io XML";
     scheduleShareUrl();
     updateEditor();
@@ -340,89 +262,9 @@ function scheduleShareUrl(): void {
     shareDebounce = setTimeout(() => { void syncShareUrl(dslSource, revision); }, 3000);
 }
 
-function escapeHtml(value: string): string {
-    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function tokenClass(value: string, firstToken: boolean): string {
-    if (firstToken && /^(direction|layout|node-spacing|layer-spacing|edge-spacing|padding|grid-columns)$/.test(value)) return "keyword";
-    if (/^(?:[TRBLtrbl]:)?[A-Za-z_][\w-]*:[A-Za-z_][\w-]*$/.test(value)) return "symbol";
-    if (/^(?:[TRBLtrbl]:)?[A-Za-z_][\w-]*$/.test(value)) return "identifier";
-    if (/^\d+$/.test(value)) return "number";
-    if (/^(<-->|<-\.->|-->|-\.->|---|-\.-)$/.test(value)) return "operator";
-    if (/^[{}]$/.test(value)) return "brace";
-    return "plain";
-}
-
-function highlightLine(line: string): { html: string; kind: string } {
-    let html = "";
-    let index = 0;
-    let firstToken = true;
-    let kind = "plain";
-    const add = (value: string, className: string): void => {
-        html += `<span class="token-${className}">${escapeHtml(value)}</span>`;
-        if (className !== "plain" && kind === "plain") kind = className;
-    };
-    while (index < line.length) {
-        const rest = line.slice(index);
-        if (rest[0] === "#") {
-            add(rest, "comment");
-            break;
-        }
-        if (rest[0] === '"') {
-            let end = 1;
-            while (end < rest.length) {
-                if (rest[end] === "\\") end += 2;
-                else if (rest[end] === '"') {
-                    end += 1;
-                    break;
-                } else end += 1;
-            }
-            add(rest.slice(0, end), "string");
-            index += end;
-            firstToken = false;
-            continue;
-        }
-        const match = rest.match(/^(\s+|<-->|<-\.->|-->|-\.->|---|-\.-|[TRBLtrbl]:|[A-Za-z_][\w-]*:[A-Za-z_][\w-]*|[A-Za-z_][\w-]*|\d+|[{}]|.)/s)!;
-        const value = match[0]!;
-        const className = /^\s+$/.test(value) ? "plain" : tokenClass(value, firstToken);
-        add(value, className);
-        if (!/^\s+$/.test(value)) firstToken = false;
-        index += value.length;
-    }
-    return { html: html || " ", kind };
-}
-
-function syncEditorScroll(): void {
-    syntaxHighlight.scrollTop = source.scrollTop;
-    syntaxHighlight.scrollLeft = source.scrollLeft;
-    lineNumbers.scrollTop = source.scrollTop;
-    foldGutter.scrollTop = source.scrollTop;
-}
-
 function updateEditor(): void {
-    const lines = source.value.split("\n");
-    const activeLine = source.value.slice(0, source.selectionStart).split("\n").length - 1;
-    const regions = showingXml ? [] : foldRegions;
-    const regionByStart = new Map(regions.map((region) => [region.start, region]));
-    const results = lines.map((line) => showingXml ? { html: escapeHtml(line) || " ", kind: "plain" } : highlightLine(line));
-    syntaxHighlight.innerHTML = results.map((result, index) => {
-        const fullLine = showingXml ? -1 : (foldMaps.displayToFull[index] ?? -1);
-        const folded = fullLine >= 0 && foldedStarts.has(fullLine);
-        return `<span class="editor-line${index === activeLine ? " active" : ""}${folded ? " folded" : ""}">${result.html}</span>`;
-    }).join("");
-    lineNumbers.innerHTML = results.map((result, index) => `<span class="editor-line token-${result.kind}${index === activeLine ? " active" : ""}">${index + 1}</span>`).join("");
-    foldGutter.innerHTML = lines.map((_, index) => {
-        const fullLine = showingXml ? -1 : (foldMaps.displayToFull[index] ?? -1);
-        const region = fullLine >= 0 ? regionByStart.get(fullLine) : undefined;
-        if (!region) return "<span class=\"editor-line\"></span>";
-        const folded = foldedStarts.has(fullLine);
-        const label = folded ? `Unfold lines ${region.start + 1} to ${region.end + 1}` : `Fold lines ${region.start + 1} to ${region.end + 1}`;
-        return `<span class="editor-line"><button class="fold-toggle-btn" type="button" data-fold-start="${fullLine}" aria-expanded="${String(!folded)}" aria-label="${label}">${folded ? "▸" : "▾"}</button></span>`;
-    }).join("");
-    foldToggle.disabled = showingXml || !regions.length;
-    foldToggle.textContent = !regions.length || foldedStarts.size < regions.length ? "Fold all" : "Unfold all";
-    syncEditorScroll();
+    foldToggle.disabled = showingXml || !foldRegions.length;
+    foldToggle.textContent = view.dom.querySelector(".cm-foldPlaceholder") ? "Unfold all" : "Fold all";
 }
 
 function markSourceChanged(): void {
@@ -462,8 +304,7 @@ async function render(): Promise<void> {
         downloadDrawio.disabled = false;
         xmlToggle.disabled = false;
         if (showingXml) {
-            source.value = xml;
-            lastDisplay = xml;
+            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: xml } });
             updateEditor();
         }
         try {
@@ -641,16 +482,14 @@ formatDslButton.addEventListener("click", () => {
 gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
     source.setAttribute("aria-label", showingXml ? "draw.io XML output (read-only)" : "DrawDSL source");
-    source.readOnly = showingXml;
-    editorInput.classList.toggle("no-fold", showingXml);
+    view.dispatch({ effects: modeCompartment.reconfigure(editorExtensions(showingXml)) });
 }
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
     showingXml = !showingXml;
     if (showingXml) {
         dslSource = getEditorFull();
-        source.value = latestXml;
-        lastDisplay = latestXml;
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: latestXml } });
         updateEditor();
         xmlToggle.textContent = "📝 Show DSL";
     } else {
@@ -667,12 +506,15 @@ source.addEventListener("keydown", (event) => {
         formatDslButton.focus();
         return;
     }
-    if (event.key !== "Tab" || event.shiftKey || showingXml) return;
+    if (event.key === "Tab" && event.shiftKey) {
+        event.preventDefault();
+        formatDslButton.focus();
+        return;
+    }
+    if (event.key !== "Tab" || showingXml) return;
     event.preventDefault();
-    const start = source.selectionStart;
-    const end = source.selectionEnd;
-    source.setRangeText("    ", start, end, "end");
-    source.dispatchEvent(new Event("input"));
+    const { from, to } = view.state.selection.main;
+    view.dispatch({ changes: { from, to, insert: "    " }, selection: { anchor: from + 4 } });
 });
 copyXml.addEventListener("click", async () => {
     if (!latestXml || copyXml.disabled) return;
@@ -713,9 +555,11 @@ themeToggle.addEventListener("click", () => {
     themeToggle.setAttribute("aria-pressed", String(darkMode));
     if (lastGoodXml) showPreview(lastGoodXml);
 });
-source.addEventListener("input", () => {
+view.dom.addEventListener("click", () => updateEditor());
+view.dom.addEventListener("input", () => {
     if (showingXml) return;
-    syncEditorFromDisplay();
+    editorFull = editorText();
+    foldRegions = computeFoldRegions(editorFull);
     dslSource = editorFull;
     markSourceChanged();
     scheduleShareUrl();
@@ -723,26 +567,12 @@ source.addEventListener("input", () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => void render(), 300);
 });
-foldGutter.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest("[data-fold-start]");
-    if (!button) return;
-    toggleFold(Number((button as HTMLElement).dataset.foldStart));
-});
 foldToggle.addEventListener("click", () => {
     if (showingXml || !foldRegions.length) return;
-    getEditorFull();
-    if (foldedStarts.size < foldRegions.length) foldRegions.forEach((region) => foldedStarts.add(region.start));
-    else foldedStarts.clear();
-    renderFoldedView();
+    if (view.dom.querySelector(".cm-foldPlaceholder")) unfoldAll(view);
+    else foldAll(view);
     updateEditor();
-    source.focus();
-});
-source.addEventListener("scroll", syncEditorScroll);
-source.addEventListener("focus", updateEditor);
-source.addEventListener("click", updateEditor);
-source.addEventListener("keyup", updateEditor);
-document.addEventListener("selectionchange", () => {
-    if (document.activeElement === source) updateEditor();
+    view.focus();
 });
 void (async () => {
     let initialError = "";

@@ -1,4 +1,7 @@
 :root {
+    --editor-text: #172033;
+    --editor-gutter: #f1f4f9;
+    --editor-active: #527fff18;
     color: #172033;
     background: #f4f6fa;
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -144,44 +147,10 @@ label { font-size: 13px; font-weight: 700; }
 .editor-toolbar button:hover:not(:disabled) { background: #f1f4f9; }
 .editor-toolbar button:disabled { cursor: not-allowed; opacity: 0.5; }
 
-textarea {
-    width: 100%;
-    min-height: 240px;
-    resize: none;
-    padding: 14px;
-    border: 1px solid #c5ccda;
-    border-radius: 6px;
-    outline: none;
-    color: #172033;
-    background: #fbfcfe;
-    font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    tab-size: 4;
-}
-
-.editor-input { display: grid; grid-template-columns: 26px 42px 1fr; min-height: 0; }
-.editor-input.no-fold { grid-template-columns: 42px 1fr; }
-.editor-input.no-fold #fold-gutter { display: none; }
-#fold-gutter { margin: 0; padding: 14px 0; overflow: hidden; border: 1px solid #c5ccda; border-right: 0; border-radius: 6px 0 0 6px; background: #f1f4f9; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; user-select: none; }
-#fold-gutter .editor-line { width: auto; min-width: 0; text-align: center; }
-.fold-toggle-btn { width: 100%; padding: 0; border: 0; color: #71809d; background: transparent; cursor: pointer; font: inherit; line-height: inherit; }
-.fold-toggle-btn:hover { color: #172033; }
-#line-numbers { margin: 0; padding: 14px 10px 14px 0; overflow: hidden; border: 1px solid #c5ccda; border-right: 0; border-radius: 0; color: #8994a8; background: #f1f4f9; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: right; user-select: none; }
-.editor-line { display: block; width: max-content; min-width: 100%; height: 1.55em; line-height: 1.55; white-space: pre; }
-#line-numbers .editor-line { padding-right: 0; }
-.editor-code { position: relative; min-width: 0; overflow: hidden; border: 1px solid #c5ccda; border-radius: 0 6px 6px 0; background: #fbfcfe; }
-#syntax-highlight { position: absolute; inset: 0; margin: 0; padding: 14px; overflow: scroll; scrollbar-width: none; color: #172033; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; pointer-events: none; }
-#syntax-highlight::-webkit-scrollbar { display: none; }
-.editor-code textarea { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; border: 0; border-radius: 0; color: transparent; background: transparent; caret-color: #172033; }
-.editor-code:focus-within { border-color: #527fff; box-shadow: 0 0 0 3px #527fff22; }
-.editor-line.active { background: #527fff18; }
-#syntax-highlight .editor-line.folded::after { content: " …"; color: #8994a8; }
-.token-keyword { color: #8b3d9a; }
-.token-symbol { color: #1565a8; }
-.token-identifier { color: #34405a; }
-.token-number { color: #a04a16; }
-.token-operator, .token-brace { color: #9b2c2c; }
-.token-string { color: #397a3f; }
-.token-comment { color: #8994a8; }
+.editor-input { min-height: 0; overflow: hidden; border: 1px solid #c5ccda; border-radius: 6px; background: #fbfcfe; }
+.editor-input:focus-within { border-color: #527fff; box-shadow: 0 0 0 3px #527fff22; }
+.editor-input .cm-editor { height: 100%; }
+.editor-input .cm-gutters { user-select: none; }
 
 output {
     min-height: 20px;
@@ -215,11 +184,13 @@ output {
     }
 
     .editor-pane { border-right: 0; border-bottom: 1px solid #d8deea; }
-    textarea { resize: vertical; }
     .saved-bar { padding: 8px 16px; overflow-x: auto; }
 }
 
 :root[data-theme="dark"] {
+    --editor-text: #edf2ff;
+    --editor-gutter: #151d2d;
+    --editor-active: #527fff28;
     color: #edf2ff;
     background: #101522;
 }
@@ -236,26 +207,7 @@ output {
 :root[data-theme="dark"] .saved-item.active .saved-load { border-color: #7fa1ff; color: #d9e2ff; }
 :root[data-theme="dark"] .saved-item .saved-delete { color: #ffb4b4; }
 
-:root[data-theme="dark"] textarea {
-    border-color: #3b4862;
-    color: #edf2ff;
-    background: #101522;
-}
-
-:root[data-theme="dark"] #line-numbers { border-color: #3b4862; color: #71809d; background: #151d2d; }
-:root[data-theme="dark"] #fold-gutter { border-color: #3b4862; background: #151d2d; }
-:root[data-theme="dark"] .fold-toggle-btn:hover { color: #edf2ff; }
-:root[data-theme="dark"] #syntax-highlight .editor-line.folded::after { color: #71809d; }
-:root[data-theme="dark"] .editor-code { border-color: #3b4862; background: #101522; }
-:root[data-theme="dark"] #syntax-highlight { color: #edf2ff; }
-:root[data-theme="dark"] .editor-code textarea { caret-color: #edf2ff; }
-:root[data-theme="dark"] .token-keyword { color: #d9a7ff; }
-:root[data-theme="dark"] .token-symbol { color: #7fc7ff; }
-:root[data-theme="dark"] .token-identifier { color: #b9c6e4; }
-:root[data-theme="dark"] .token-number { color: #ffbb82; }
-:root[data-theme="dark"] .token-operator, :root[data-theme="dark"] .token-brace { color: #ff9d9d; }
-:root[data-theme="dark"] .token-string { color: #96d99b; }
-:root[data-theme="dark"] .token-comment { color: #71809d; }
+:root[data-theme="dark"] .editor-input { border-color: #3b4862; background: #101522; }
 
 :root[data-theme="dark"] #preview {
     border-color: #303b52;

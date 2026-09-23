@@ -42,14 +42,7 @@
                     <button id="download-drawio" type="button" disabled>⬇️ Download .drawio</button>
                 </div>
             </div>
-            <div class="editor-input">
-                <div id="fold-gutter" aria-label="Fold containers"></div>
-                <pre id="line-numbers" aria-hidden="true"><span>1</span></pre>
-                <div class="editor-code">
-                    <pre id="syntax-highlight" aria-hidden="true"></pre>
-                    <textarea id="source" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-                </div>
-            </div>
+            <div id="source" class="editor-input" aria-label="DrawDSL source"></div>
             <output id="status" aria-live="polite"></output>
             <button id="goto-error" type="button" hidden>Go to error line</button>
         </section>
