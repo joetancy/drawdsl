@@ -2,14 +2,15 @@ import { DslError, isRenderable, type AstEdge, type AstNode, type Direction, typ
 import { layoutNumber, normalizeLayoutConfig, type ContainerLayoutOptions, type ParsedLayoutConfig } from "./config.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
-const EDGE_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)(?:\s*:\s*(.+?))?\s*$/;
+const EDGE_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)(?:\s+\[([^\]]*)\])?(?:\s*:\s*(.+?))?\s*$/;
 const CHAIN_OPERATOR_RE = /\s*(<-->|<-\.->|-->|-\.->|---|-\.-)\s*/g;
 const ENDPOINT_RE = /^(?:([TRBLtrbl]):)?([A-Za-z_][\w-]*)$/;
 const DIRECTION_RE = /^direction\s+(right|left|down|up)$/;
 const DEFAULT_LAYOUT_RE = /^layout\s+elk$/;
-const GRID_COLUMNS_RE = /^grid-columns\s+(\S+)$/;
+const GRID_COLUMNS_RE = /^(col|grid-columns)\s+(\S+)$/;
 const LAYOUT_SETTING_RE = /^(node-spacing|layer-spacing|edge-spacing|padding)(?:\s+(.*))?$/;
-const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?\s*(\{)?$/;
+const COLOR_DECL_RE = /^color\s+([A-Za-z_][\w-]*)\s*=\s*(#\S+)$/;
+const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
 function scanLine(line: string): { commentIndex: number; unclosedQuote: boolean } {
@@ -20,7 +21,7 @@ function scanLine(line: string): { commentIndex: number; unclosedQuote: boolean 
         if (escaped) { escaped = false; continue; }
         if (c === "\\") { escaped = true; continue; }
         if (c === '"') quoted = !quoted;
-        if (c === "#" && !quoted) return { commentIndex: i, unclosedQuote: quoted };
+        if (c === "#" && !quoted && !line.slice(0, i).trimEnd().endsWith("=")) return { commentIndex: i, unclosedQuote: quoted };
     }
     return { commentIndex: -1, unclosedQuote: quoted };
 }
@@ -35,7 +36,7 @@ export function hasUnclosedQuote(line: string): boolean {
 }
 
 export function isBlockOpener(code: string): boolean {
-    return Boolean(code.match(DECLARATION_RE)?.[5]);
+    return Boolean(code.match(DECLARATION_RE)?.[6]);
 }
 
 function unescapeQuoted(value: string): string {
@@ -55,6 +56,37 @@ function nodeSide(value: string | undefined): NodeSide | undefined {
     if (!value) return undefined;
     const sides: Record<"T" | "R" | "B" | "L", NodeSide> = { T: "top", R: "right", B: "bottom", L: "left" };
     return sides[value.toUpperCase() as keyof typeof sides];
+}
+
+function hexColor(value: string): string | undefined {
+    if (!/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value)) return undefined;
+    const hex = value.slice(1).toUpperCase();
+    return `#${hex.length === 3 ? [...hex].map((digit) => digit.repeat(2)).join("") : hex}`;
+}
+
+function colorValue(value: string, colors: Map<string, string>): string | undefined {
+    return hexColor(value) ?? colors.get(value);
+}
+
+function edgeOptions(raw: string | undefined, colors: Map<string, string>, lineNumber: number): { color?: string; width?: number } {
+    if (raw === undefined) return {};
+    const result: { color?: string; width?: number } = {};
+    for (const option of raw.split(",")) {
+        const match = option.trim().match(/^(color|width)\s*=\s*(\S+)$/);
+        if (!match) throw new DslError(`Line ${lineNumber}: invalid edge option: ${option.trim()}`, lineNumber);
+        const key = match[1]!;
+        const value = match[2]!;
+        if (key === "width") {
+            if (result.width !== undefined) throw new DslError(`Line ${lineNumber}: duplicate edge width`, lineNumber);
+            result.width = layoutNumber("edge-width", value, lineNumber);
+            continue;
+        }
+        if (result.color !== undefined) throw new DslError(`Line ${lineNumber}: duplicate edge color`, lineNumber);
+        const color = colorValue(value, colors);
+        if (!color) throw new DslError(`Line ${lineNumber}: invalid or unknown edge color: ${value}`, lineNumber);
+        result.color = color;
+    }
+    return result;
 }
 
 function parseEdgeChain(line: string): Array<{ id: string; side?: NodeSide; operator?: EdgeOperator }> | undefined {
@@ -93,6 +125,7 @@ export function parseDsl(source: string): DocumentAst {
     const ids = new Set<string>();
     const parsedLayout: ParsedLayoutConfig = {};
     const documentSettings = new Set<string>();
+    const colors = new Map<string, string>();
     let order = 0;
     let anonymousNodeCount = 0;
 
@@ -107,6 +140,16 @@ export function parseDsl(source: string): DocumentAst {
         }
         const line = stripComment(rawLine).trim();
         if (!line) continue;
+        const colorMatch = line.match(COLOR_DECL_RE);
+        if (colorMatch) {
+            if (stack.length) throw new DslError(`Line ${lineNumber}: color constants must be top-level`, lineNumber);
+            const name = colorMatch[1]!;
+            const color = hexColor(colorMatch[2]!);
+            if (!color) throw new DslError(`Line ${lineNumber}: color must be a 3- or 6-digit hex value`, lineNumber);
+            if (colors.has(name)) throw new DslError(`Line ${lineNumber}: color ${name} is already defined`, lineNumber);
+            colors.set(name, color);
+            continue;
+        }
         if (line === "}") {
             if (!stack.length) throw new DslError(`Line ${lineNumber}: unexpected }`, lineNumber);
             stack.pop();
@@ -132,10 +175,12 @@ export function parseDsl(source: string): DocumentAst {
         const gridColumnsMatch = line.match(GRID_COLUMNS_RE);
         if (gridColumnsMatch) {
             const container = stack.at(-1);
-            if (!container) throw new DslError(`Line ${lineNumber}: grid-columns must be inside a container`, lineNumber);
+            const directive = gridColumnsMatch[1]!;
+            const name = directive === "grid-columns" ? directive : "col";
+            if (!container) throw new DslError(`Line ${lineNumber}: ${name} must be inside a container`, lineNumber);
             container.layout ??= {};
-            if (container.layout.gridColumns !== undefined) throw new DslError(`Line ${lineNumber}: grid-columns is already set for container ${container.id}`, lineNumber);
-            container.layout.gridColumns = layoutNumber("grid-columns", gridColumnsMatch[1], lineNumber);
+            if (container.layout.gridColumns !== undefined) throw new DslError(`Line ${lineNumber}: ${name} is already set for container ${container.id}`, lineNumber);
+            container.layout.gridColumns = layoutNumber(name, gridColumnsMatch[2], lineNumber);
             continue;
         }
         const layoutSettingMatch = line.match(LAYOUT_SETTING_RE);
@@ -158,6 +203,7 @@ export function parseDsl(source: string): DocumentAst {
         }
         const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
+            const options = edgeOptions(edgeMatch[6], colors, lineNumber);
             edges.push({
                 id: `edge:${edges.length + 1}:${edgeMatch[2]}:${edgeMatch[5]}`,
                 source: edgeMatch[2]!,
@@ -165,7 +211,8 @@ export function parseDsl(source: string): DocumentAst {
                 sourceSide: nodeSide(edgeMatch[1]),
                 targetSide: nodeSide(edgeMatch[4]),
                 operator: edgeMatch[3] as EdgeOperator,
-                label: unquoteLabel(edgeMatch[6]),
+                label: unquoteLabel(edgeMatch[7]),
+                ...options,
                 declarationOrder: order++,
                 line: lineNumber,
             });
@@ -201,7 +248,16 @@ export function parseDsl(source: string): DocumentAst {
         const symbol = parseSymbol(`${declarationMatch[1]}:${declarationMatch[2]}`, lineNumber);
         const explicitId = declarationMatch[3];
         const quotedLabel = declarationMatch[4];
-        const opensBlock = Boolean(declarationMatch[5]);
+        const opensBlock = Boolean(declarationMatch[6]);
+        let backgroundColor: string | undefined;
+        const rawGroupOptions = declarationMatch[5];
+        if (rawGroupOptions !== undefined) {
+            if (symbol.ref.namespace !== "core" || symbol.ref.name !== "group") throw new DslError(`Line ${lineNumber}: background color is only supported on core:group`, lineNumber);
+            const option = rawGroupOptions.trim().match(/^background\s*=\s*(\S+)$/);
+            if (!option) throw new DslError(`Line ${lineNumber}: invalid group option: ${rawGroupOptions}`, lineNumber);
+            backgroundColor = colorValue(option[1]!, colors);
+            if (!backgroundColor) throw new DslError(`Line ${lineNumber}: invalid or unknown group background color: ${option[1]}`, lineNumber);
+        }
         const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (symbol.ref.namespace === "core" && symbol.ref.name === "image") {
             if (quotedLabel === undefined) throw new DslError(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`, lineNumber);
@@ -234,6 +290,7 @@ export function parseDsl(source: string): DocumentAst {
             symbol: symbol.ref,
             definition: symbol.definition,
             label,
+            ...(backgroundColor ? { backgroundColor } : {}),
             parentId: parent?.id,
             children: [],
             declarationOrder: order++,
@@ -251,7 +308,7 @@ export function parseDsl(source: string): DocumentAst {
     while (pendingNodes.length) {
         const node = pendingNodes.pop()!;
         nodesById.set(node.id, node);
-        if (node.layout?.gridColumns !== undefined && !node.children.length) throw new DslError(`Line ${node.line ?? "?"}: grid-columns requires at least one child (container ${node.id})`, node.line);
+        if (node.layout?.gridColumns !== undefined && !node.children.length) throw new DslError(`Line ${node.line ?? "?"}: col requires at least one child (container ${node.id})`, node.line);
         pendingNodes.push(...node.children);
     }
     for (const edge of edges) {

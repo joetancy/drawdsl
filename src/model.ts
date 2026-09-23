@@ -50,6 +50,7 @@ export type AstNode = {
     symbol: SymbolRef;
     definition: SymbolDefinition;
     label: string;
+    backgroundColor?: string;
     parentId?: string;
     children: AstNode[];
     layout?: ContainerLayoutOptions;
@@ -65,6 +66,8 @@ export type AstEdge = {
     targetSide?: NodeSide;
     operator: EdgeOperator;
     label?: string;
+    color?: string;
+    width?: number;
     declarationOrder: number;
     line?: number;
 };
@@ -82,6 +85,7 @@ export type FlatLayoutNode = {
     symbol: SymbolRef;
     definition: SymbolDefinition;
     label: string;
+    backgroundColor?: string;
     parentId?: string;
     x: number;
     y: number;

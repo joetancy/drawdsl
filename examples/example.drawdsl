@@ -1,5 +1,7 @@
-# ELK provides hierarchy-aware orthogonal routing.
+# Example architecture using hierarchy-aware orthogonal routing.
 direction right
+color primary = #F90
+color platform = #EEF2F7
 
 aws:internet internet "Public internet"
 core:image reference_image "https://placehold.co/320x200/png?text=External+image"
@@ -29,7 +31,8 @@ aws:cloud cloud "AWS Cloud" {
             }
         }
 
-        core:group operations "Operations" {
+        core:group operations "Operations" [background=platform] {
+            col 2
             aws:sns topic "Deployment notifications"
             aws:cloudwatch_2 monitoring "Monitoring"
             core:text ops_note "Shared platform services"
@@ -37,13 +40,13 @@ aws:cloud cloud "AWS Cloud" {
     }
 }
 
-internet --> cdn : HTTPS
+internet --> cdn [color=primary, width=2] : HTTPS
 cdn -.-> alb : cached requests
 alb --> api : forwards
 api --- lambda1 : invokes
 lambda1 -.- lambda2 : peer handoff
 lambda1 <--> data : reads and writes
-lambda2 <-.-> queue : async jobs
+lambda2 <-.-> queue [color=primary, width=2] : async jobs
 data --> database : persists
 lambda1 --> bucket : archives
 topic --> lambda2 : notifications

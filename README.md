@@ -8,7 +8,7 @@
 
 ```bash
 npm install
-npm run generate -- examples/elk.drawdsl output.drawio
+npm run generate -- examples/example.drawdsl output.drawio
 ```
 
 Open `output.drawio` in [diagrams.net](https://www.diagrams.net/) or draw.io Desktop. Generated nodes, groups, labels, and connectors remain editable.
@@ -71,7 +71,31 @@ R:lambda_main --> T:notifications_queue
 
 These selectors mean top, right, bottom, and left respectively. They are honored by ELK’s router and preserved in draw.io.
 
-Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted labels. Unqualified declarations such as `lambda handler` are intentionally rejected.
+Set an edge's color and width with bracketed options. Hex colors accept `#RGB` and `#RRGGBB`; define a named color once and reuse it:
+
+```text
+color primary = #f90
+color alert = #D13212
+
+source --> target [color=primary, width=3] : HTTPS
+target -.-> source [color=alert]
+source --- target [color=#123ABC, width=2]
+```
+
+Color constants must be declared at document level before use. Edge width is a positive integer from 1 to 10000 and defaults to 1; edge color defaults to draw.io's default.
+
+Set a `core:group` background using the same constants or a hex value:
+
+```text
+color panel = #EEF2F7
+core:group services "Services" [background=panel] {
+    col 2
+    aws:lambda api
+    aws:lambda worker
+}
+```
+
+Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted labels except when it begins a hex color value. Unqualified declarations such as `lambda handler` are intentionally rejected.
 
 ## Built-in symbol providers
 
@@ -114,16 +138,16 @@ aws:lambda third
 ```text
 aws:vpc application {
     core:layout application_grid {
-        grid-columns 2
+        col 2
 
         core:layout compute_column {
-            grid-columns 1
+            col 1
             aws:lambda api
             aws:lambda worker
         }
 
         core:layout data_column {
-            grid-columns 1
+            col 1
             aws:sqs jobs
             aws:dynamodb records
         }
@@ -134,7 +158,7 @@ api --> jobs
 worker --> records
 ```
 
-`grid-columns` applies to a container’s direct children. Child subtrees are first sized, then placed into an exact declaration-ordered grid. When omitted, containers automatically use `ceil(sqrt(child count))` columns (six children use three columns; nine use three). Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
+`col N` sets a container’s direct-child grid column count. Child subtrees are first sized, then placed into an exact declaration-ordered grid. When omitted, containers automatically use `ceil(sqrt(child count))` columns (six children use three columns; nine use three). Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
 
 Layout settings use the same flat, hyphenated syntax as the existing directives. Document-level values apply throughout the diagram; a setting inside a container overrides that container's direct-child layout:
 
@@ -146,13 +170,13 @@ edge-spacing 24
 padding 40
 
 core:layout application_grid {
-    grid-columns 5
+    col 5
     node-spacing 60
     padding 20
 }
 ```
 
-`direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `grid-columns` accepts 1 to 10000 and must be inside a container with at least one child. `edge-spacing` is document-only. Each directive may be set only once per document or container; duplicates fail. Partial configuration is supported.
+`direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `col` accepts 1 to 10000 and must be inside a container with at least one child. `edge-spacing` is document-only. Each directive may be set only once per document or container; duplicates fail. Partial configuration is supported.
 
 Labels support `\n`, `\"`, and `\\` escapes, including literal multiline quoted labels; CRLF line endings parse like LF. Errors report the offending source line in both the CLI and the playground, where a Go-to-line button focuses the editor.
 
@@ -168,7 +192,7 @@ core:group workers {
 }
 ```
 
-Container directions support `right`, `left`, `down`, and `up`. A local `direction` opts that container into ELK layout; explicit `grid-columns` remains grid-ordered and takes precedence. The document direction still controls only the top-level layout.
+Container directions support `right`, `left`, `down`, and `up`. A local `direction` opts that container into ELK layout; explicit `col` remains grid-ordered and takes precedence. The document direction still controls only the top-level layout.
 
 ELK positions the hierarchy and the orthogonal router uses the completed geometry. Visible containers unrelated to either endpoint remain routing obstacles, while source and destination ancestor containers stay traversable so connections can enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points.
 

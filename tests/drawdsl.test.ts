@@ -52,6 +52,27 @@ test("supports bidirectional solid and dashed connections", () => {
     assert.match(xml, /endArrow=block/);
 });
 
+test("edge colors can be defined as reusable hex constants with per-edge widths", async () => {
+    const ast = parseDsl(`color primary = #f90
+aws:lambda source
+aws:sqs target
+source --> target [color=primary, width=4] : invokes
+target -.-> source [color=#123abc, width=2]
+source --- target [color=primary]`);
+    assert.deepEqual(ast.edges.map(({ color, width, label }) => [color, width, label]), [
+        ["#FF9900", 4, "invokes"],
+        ["#123ABC", 2, undefined],
+        ["#FF9900", undefined, undefined],
+    ]);
+    const layout = await layoutDocument(ast);
+    const xml = renderDrawio(layout.nodes, layout.edges);
+    assert.match(xml, /strokeWidth=4;strokeColor=#FF9900;/);
+    assert.match(xml, /strokeWidth=2;strokeColor=#123ABC;/);
+    assert.throws(() => parseDsl("color primary = #fff\ncolor primary = #000"), /already defined/);
+    assert.throws(() => parseDsl("aws:lambda a\naws:lambda b\na --> b [color=unknown]"), /unknown edge color/);
+    assert.throws(() => parseDsl("aws:lambda a\naws:lambda b\na --> b [width=0]"), /edge-width/);
+});
+
 test("chains existing edge operators into distinct binary edges", () => {
     const ast = parseDsl(`aws:lambda a
 aws:sqs b
@@ -218,6 +239,24 @@ worker_a --> worker_d`);
     assert.doesNotMatch(xml, /id="columns"/);
     assert.match(xml, /parent="workers"/);
     assert.match(xml, /exitPerimeter=1/);
+});
+
+test("core groups accept reusable background colors and col directives", async () => {
+    const ast = parseDsl(`color panel = #eef2f7
+core:group services "Services" [background=panel] {
+    col 2
+    aws:lambda api
+    aws:lambda worker
+}`);
+    assert.equal(ast.nodes[0]?.backgroundColor, "#EEF2F7");
+    assert.equal(ast.nodes[0]?.layout?.gridColumns, 2);
+    const layout = await layoutDocument(ast);
+    assert.match(renderDrawio(layout.nodes, layout.edges), /fillColor=#EEF2F7/);
+    assert.equal(parseDsl("core:group direct [background=#abc] {\naws:lambda fn\n}").nodes[0]?.backgroundColor, "#AABBCC");
+    assert.throws(() => parseDsl("aws:cloud c [background=#fff] {\naws:lambda fn\n}"), /only supported on core:group/);
+    assert.throws(() => parseDsl("core:group g [background=missing] {\naws:lambda fn\n}"), /unknown group background color/);
+    assert.throws(() => parseDsl("core:group g [fill=#fff] {\naws:lambda fn\n}"), /invalid group option/);
+    assert.throws(() => parseDsl("col 2"), /must be inside a container/);
 });
 
 test("grid columns preserve declaration order and center mixed-size groups", async () => {
@@ -616,8 +655,8 @@ test("formatter output is idempotent and re-parses to the same document", () => 
     assert.deepEqual(after.edges.map((edge) => [edge.source, edge.target, edge.label]), before.edges.map((edge) => [edge.source, edge.target, edge.label]));
 });
 
-test("the bundled legacy DrawDSL file still parses, lays out, and renders", async () => {
-    const source = await readFile(new URL("../examples/elk.drawdsl", import.meta.url), "utf8");
+test("the bundled DrawDSL example parses, lays out, and renders", async () => {
+    const source = await readFile(new URL("../examples/example.drawdsl", import.meta.url), "utf8");
     const ast = parseDsl(source);
     const layout = await layoutDocument(ast);
     const xml = renderDrawio(layout.nodes, layout.edges);

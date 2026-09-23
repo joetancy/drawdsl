@@ -137,7 +137,7 @@ function flatten(nodes: PositionedNode[]): FlatLayoutNode[] {
     const visit = (node: PositionedNode, ox: number, oy: number, parentId?: string): void => {
         const x = ox + node.x;
         const y = oy + node.y;
-        result.push({ id: node.ast.id, symbol: node.ast.symbol, definition: node.ast.definition, label: node.ast.label, parentId, x, y, width: node.width, height: node.height, declarationOrder: node.ast.declarationOrder });
+        result.push({ id: node.ast.id, symbol: node.ast.symbol, definition: node.ast.definition, label: node.ast.label, backgroundColor: node.ast.backgroundColor, parentId, x, y, width: node.width, height: node.height, declarationOrder: node.ast.declarationOrder });
         node.children.forEach((child) => visit(child, x, y, node.ast.id));
     };
     nodes.forEach((node) => visit(node, 0, 0));

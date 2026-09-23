@@ -4,7 +4,7 @@ import type { Extension, Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { computeFoldRegions } from "./fold.js";
 
-const directives = /^(direction|layout|node-spacing|layer-spacing|edge-spacing|padding|grid-columns)$/;
+const directives = /^(direction|layout|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
 const operators = /^(<-->|<-\.->|-->|-\.->|---|-\.-)$/;
 const foldsByDoc = new WeakMap<Text, ReturnType<typeof computeFoldRegions>>();
 

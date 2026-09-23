@@ -17,10 +17,11 @@ function nodeStyle(node: FlatLayoutNode): string {
         return styleString(["shape=image", "imageAspect=1", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
     }
     if (node.definition.role === "container") {
+        const fill = node.backgroundColor ?? drawio.fill;
         return styleString([
             "points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]]",
             "outlineConnect=0", "gradientColor=none", "html=1", "whiteSpace=wrap", "fontSize=12", "fontStyle=0", "container=1", "pointerEvents=0", "collapsible=0", "recursiveResize=0", `shape=${drawio.shape}`, "verticalAlign=top", "align=left", "spacingLeft=30", "dashed=0",
-            ...(drawio.fill ? [`fillColor=${drawio.fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : []), ...(drawio.styles ?? []),
+            ...(fill ? [`fillColor=${fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : []), ...(drawio.styles ?? []),
         ]);
     }
     if (node.definition.role === "annotation") {
@@ -48,7 +49,7 @@ function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string
     const directed = operator === "-->" || operator === "-.->" || operator === "<-->" || operator === "<-.->";
     const bidirectional = operator === "<-->" || operator === "<-.->";
     const dashed = operator === "-.->" || operator === "-.-" || operator === "<-.->";
-    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", "strokeWidth=1", `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
+    return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", `strokeWidth=${edge.width ?? 1}`, ...(edge.color ? [`strokeColor=${edge.color}`] : []), `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
 }
 
 export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
