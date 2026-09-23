@@ -164,6 +164,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .menu-disclosure > summary { list-style: none; user-select: none; }
 .menu-disclosure > summary::-webkit-details-marker { display: none; }
 .menu-disclosure > summary::after { width: 6px; height: 6px; margin: -3px 0 0 1px; transform: rotate(45deg); border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; content: ""; }
+#saved-menu > summary { flex-wrap: nowrap; line-height: 1; }
+#saved-menu > summary > svg, #saved-menu > summary > span { display: inline-flex; flex: 0 0 auto; align-items: center; vertical-align: middle; line-height: 1; }
+#saved-menu > summary > #saved-current-status { flex: 0 1 auto; min-width: 0; }
+#saved-menu > summary > #saved-count { display: inline-grid; flex-basis: 20px; line-height: 1; }
 .menu-disclosure[open] > summary { color: var(--text-primary); background: var(--surface-subtle); }
 .menu-panel { position: absolute; top: calc(100% + 7px); z-index: 20; display: grid; min-width: 200px; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 28px #101a2a20; }
 .menu-panel button { display: flex; min-height: 38px; align-items: center; padding: 0 10px; border: 0; border-radius: 6px; color: var(--text-primary); background: transparent; text-align: left; font-size: 13px; cursor: pointer; }

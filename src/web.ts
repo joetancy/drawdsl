@@ -615,7 +615,7 @@ view.dom.addEventListener("input", () => {
     scheduleShareUrl();
     updateEditor();
     clearTimeout(debounce);
-    debounce = setTimeout(() => void render(), 300);
+    debounce = setTimeout(() => void render(), 120);
 });
 foldToggle.addEventListener("click", () => {
     if (showingXml || !foldRegions.length) return;

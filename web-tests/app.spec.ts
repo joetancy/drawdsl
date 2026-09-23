@@ -76,6 +76,19 @@ test("rapid edits resolve to the latest source", async ({ page }) => {
     await expect(page.locator("#copy-xml")).toBeEnabled();
 });
 
+test("preview automatically recompiles after source edits", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await page.locator("#source .cm-content").fill('core:box item "Live preview update"');
+    await expect.poll(async () => {
+        const dataset = await page.locator("#preview .mxgraph").getAttribute("data-mxgraph");
+        return dataset ? JSON.parse(dataset).xml as string : "";
+    }).toContain("Live preview update");
+    await expect(page.locator("#preview-status")).toContainText("Up to date");
+});
+
 test("xml view switches and returns to dsl", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);
@@ -318,6 +331,11 @@ test("workbench disclosures, theme, dialog, and preview status stay in sync", as
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    const savedCenters = await page.locator("#saved-menu > summary").evaluate((summary) =>
+        [summary.querySelector("svg"), summary.querySelector("#saved-current-status"), summary.querySelector("#saved-count")]
+            .map((element) => element!.getBoundingClientRect())
+            .map((rect) => rect.top + rect.height / 2));
+    expect(Math.max(...savedCenters) - Math.min(...savedCenters)).toBeLessThanOrEqual(1);
     await expect(page.locator("#preview-status")).toContainText("Up to date");
     await page.locator("#source .cm-content").fill("not valid syntax");
     await expect(page.locator("#status")).toHaveAttribute("data-kind", "error", { timeout: 15_000 });
