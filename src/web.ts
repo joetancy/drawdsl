@@ -7,7 +7,7 @@ import { formatDsl } from "./formatter.js";
 import { buildShareHash, resolveShareDsl } from "./share.js";
 import { DslError } from "./model.js";
 import { computeFoldRegions, type FoldRegion } from "./fold.js";
-import { foldAll, foldEffect, unfoldAll, unfoldEffect } from "@codemirror/language";
+import { foldAll, unfoldAll, unfoldEffect } from "@codemirror/language";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { editorExtensions } from "./editor.js";
