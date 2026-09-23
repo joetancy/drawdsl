@@ -416,6 +416,34 @@ test("edges from different sources keep separate lanes through a shared target",
     }
 });
 
+test("pinned fan-out keeps separate lanes from a shared source", () => {
+    const icon = resolveSymbol({ namespace: "aws", name: "tgw" });
+    const positions = [{ x: 200, y: 2300 }, { x: 680, y: 1104 }, { x: 1296, y: 3080 }, { x: 2340, y: 3911 }, { x: 1296, y: 3480 }];
+    const nodes = ["hub", "upper", "middle", "lower", "bottom"].map((id, declarationOrder) => ({ id, symbol: icon.ref, definition: icon.definition, label: id, ...positions[declarationOrder]!, width: 80, height: 80, declarationOrder }));
+    const edges = ["upper", "middle", "lower", "bottom"].map((target, declarationOrder) => ({
+        id: target, source: "hub", target, sourceSide: (declarationOrder < 2 ? "top" : "bottom") as "top" | "bottom", operator: "-.-" as const, declarationOrder,
+    }));
+    const point = (x: number, y: number) => ({ x, y });
+    const routes = new Map([
+        ["upper", { sourcePoint: point(240, 2300), bendPoints: [point(240, 1144)], targetPoint: point(680, 1144) }],
+        ["middle", { sourcePoint: point(240, 2300), bendPoints: [point(240, 2260), point(360, 2260), point(360, 2990), point(1296, 2990)], targetPoint: point(1296, 3120) }],
+        ["lower", { sourcePoint: point(240, 2380), bendPoints: [point(240, 3951)], targetPoint: point(2340, 3951) }],
+        ["bottom", { sourcePoint: point(240, 2380), bendPoints: [point(240, 3390), point(1296, 3390)], targetPoint: point(1296, 3520) }],
+    ]);
+    enforceGlobalEdgeSpacing(nodes, edges, routes, DEFAULT_LAYOUT_CONFIG);
+    for (const [a, b] of [["upper", "middle"], ["lower", "bottom"]]) {
+        const first = routes.get(a!)!;
+        const second = routes.get(b!)!;
+        assert.equal(first.sourcePoint.y, second.sourcePoint.y);
+        assert.ok(Math.abs(first.sourcePoint.x - second.sourcePoint.x) >= DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+        for (const route of [first, second]) {
+            const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
+            assert.equal(points[0]!.x, points[1]!.x);
+            assert.ok(points.every((point, i) => !i || point.x === points[i - 1]!.x || point.y === points[i - 1]!.y));
+        }
+    }
+});
+
 test("pinned sides retain distinct routed attachment positions in draw.io", () => {
     const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
     const nodes = ["a", "b", "c"].map((id, declarationOrder) => ({

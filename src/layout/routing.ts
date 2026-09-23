@@ -308,17 +308,20 @@ function nudgePath(segment: Segment, offset: number, endpointClearance: number):
     return simplifyWaypoints([...points.slice(0, index + 1), shifted(segment.start, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset), ...points.slice(index + 1)]);
 }
 
-function moveTerminalLane(segment: Segment, offset: number, node: FlatLayoutNode | undefined): Point[] | undefined {
+function moveEndpointLane(segment: Segment, offset: number, node: FlatLayoutNode | undefined, source: boolean): Point[] | undefined {
     const { points, route } = segment.path;
-    if (segment.index !== points.length - 2) return undefined;
-    const junction = pointAlong(segment.start, segment.end, Math.min(
-        (Math.abs(segment.end.x - segment.start.x) + Math.abs(segment.end.y - segment.start.y)) / 2, 40,
+    if (segment.index !== (source ? 0 : points.length - 2)) return undefined;
+    const ordered = source ? [...points].reverse() : points;
+    const start = ordered.at(-2)!;
+    const end = ordered.at(-1)!;
+    const junction = pointAlong(start, end, Math.min(
+        (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) / 2, 40,
     ));
-    const candidate = points.length >= 3
-        ? [...points.slice(0, -2), shifted(segment.start, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset)]
-        : [segment.start, junction, shifted(junction, segment.horizontal, offset), shifted(segment.end, segment.horizontal, offset)];
-    if (!validAttachment(candidate.at(-1)!, candidate.at(-2)!, route.targetPoint, node, false)) return undefined;
-    return simplifyWaypoints(candidate);
+    const candidate = ordered.length >= 3
+        ? [...ordered.slice(0, -2), shifted(start, segment.horizontal, offset), shifted(end, segment.horizontal, offset)]
+        : [start, junction, shifted(junction, segment.horizontal, offset), shifted(end, segment.horizontal, offset)];
+    if (!validAttachment(candidate.at(-1)!, candidate.at(-2)!, source ? route.sourcePoint : route.targetPoint, node, false)) return undefined;
+    return simplifyWaypoints(source ? candidate.reverse() : candidate);
 }
 
 function clearContainerBorders(paths: RoutePath[], borders: LineSegment[], obstacles: Map<string, Rect[]>, config: LayoutConfig): void {
@@ -394,12 +397,14 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                 for (const segment of [b, a]) {
                     for (const multiplier of [1, -1, 2, -2, 3, -3]) {
                         const offset = multiplier * config.edgeSpacing;
-                        const terminal = a.path.edge.target === b.path.edge.target
-                            ? moveTerminalLane(segment, offset, index.byId.get(segment.path.edge.target)) : undefined;
-                        for (const candidate of [terminal, nudgePath(segment, offset, config.edgeEndpointClearance)]) {
+                        const endpoint = (a.path.edge.target === b.path.edge.target
+                            ? moveEndpointLane(segment, offset, index.byId.get(segment.path.edge.target), false) : undefined)
+                            ?? (a.path.edge.source === b.path.edge.source
+                                ? moveEndpointLane(segment, offset, index.byId.get(segment.path.edge.source), true) : undefined);
+                        for (const candidate of [endpoint, nudgePath(segment, offset, config.edgeEndpointClearance)]) {
                             if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
                             if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
-                            if (candidate !== terminal && candidate.length > simplifyWaypoints(segment.path.points).length) continue;
+                            if (candidate !== endpoint && candidate.length > simplifyWaypoints(segment.path.points).length) continue;
                             const original = segment.path.points;
                             segment.path.points = candidate;
                             if (conflictScore(paths, config.edgeSpacing) < baseline) {
