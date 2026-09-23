@@ -60,6 +60,7 @@ html { min-width: 320px; min-height: 100%; }
 
 body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     min-width: 320px;
     height: 100vh;
@@ -98,6 +99,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
     align-items: center;
     justify-content: space-between;
     gap: 20px;
+    min-width: 0;
     padding: 10px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
@@ -120,6 +122,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
     position: relative;
     z-index: 4;
     min-height: 58px;
+    min-width: 0;
     gap: 8px;
     padding: 8px 24px;
     border-bottom: 1px solid var(--border);
@@ -219,9 +222,9 @@ main {
 .editor-actions .toolbar-button { min-height: 34px; padding: 0 9px; font-size: 12px; }
 .editor-actions .toolbar-button svg { width: 15px; height: 15px; }
 
-.editor-input { min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
+.editor-input { width: 100%; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
 .editor-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
-.editor-input .cm-editor { height: 100%; }
+.editor-input .cm-editor { width: 100%; min-width: 0; height: 100%; }
 .editor-input .cm-gutters { user-select: none; }
 .editor-input .cm-focused { outline: none; }
 .editor-input .cm-cursor { border-left-color: var(--accent); border-left-width: 2px; }
@@ -272,6 +275,7 @@ dialog::backdrop { background: #10152280; backdrop-filter: blur(3px); }
     .header-actions { gap: 4px; }
     .header-actions .menu-disclosure > summary, .theme-button { min-height: 38px; padding: 0 8px; }
     .header-actions .menu-disclosure > summary span, .theme-button .button-label { display: none; }
+    .export-disclosure > summary span { display: none; }
     .document-toolbar { min-height: 54px; gap: 4px; padding: 7px 12px; }
     .saved-current-status { max-width: 92px; }
     .toolbar-button, .menu-disclosure > summary { min-height: 38px; padding: 0 8px; }
