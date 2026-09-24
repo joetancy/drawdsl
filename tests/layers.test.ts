@@ -67,7 +67,7 @@ test("layers are metadata and do not add nodes or change node ownership", () => 
 test("formatter and folding recognize layers without treating label braces as blocks", () => {
     const source = `${nodes}layer requests "Request { flow }" { # comment\na --> b : "A { label }"\n}\n`;
     const formatted = formatDsl(source);
-    assert.match(formatted, /\n    a --> b : "A \{ label \}"\n/);
+    assert.ok(formatted.includes('\n    a --> b : "A { label }"\n'));
     assert.equal(formatDsl(formatted), formatted);
     assert.deepEqual(parseDsl(formatted), parseDsl(source));
     assert.deepEqual(computeFoldRegions(source), [{ start: 3, end: 5 }]);
@@ -76,8 +76,10 @@ test("formatter and folding recognize layers without treating label braces as bl
 });
 
 test("layer labels preserve escaped and multiline text", () => {
-    const ast = parseDsl(`${nodes}layer requests "First\\nSecond \\"quoted\\"" {\na --> b\n}`.replace('\\\\"quoted', '\\"quoted'));
-    assert.equal(ast.layers[1]!.label, "First\nSecond \"quoted\"");
+    const source = nodes + String.raw`layer requests "First\nSecond \"quoted\"" {
+a --> b
+}`;
+    assert.equal(parseDsl(source).layers[1]!.label, 'First\nSecond "quoted"');
     const multiline = `${nodes}layer requests "First\nSecond" {\na --> b\n}`;
     assert.equal(parseDsl(multiline).layers[1]!.label, "First\nSecond");
     assert.equal(parseDsl(formatDsl(multiline)).layers[1]!.label, "First\nSecond");

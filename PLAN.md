@@ -49,6 +49,7 @@ Commit and push this plan before implementation. For each step below, update its
 
 - [x] P00: Publish this plan and preserve the previous backlog.
 - [x] L1: Add the layer model, parser, validation, formatter/folding support, editor syntax support, and focused language tests.
+- [x] L1a: Correct the test lint issue found by CI and simplify the escaped-label fixture.
 - [ ] L2: Carry layer metadata through compilation; export Architecture, Connections, and named layers; test geometry and endpoint preservation.
 - [ ] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
 - [ ] L4: Document the syntax and export contract, add a multi-flow example, run integration and browser regressions, and record the final results.
@@ -71,10 +72,14 @@ Where the local environment cannot install the repository dependencies, use the 
 
 ### P00
 
-Plan published before implementation in commit `0f611d3`. The previous `PLAN.md` is preserved as `IMPROVEMENT_PLAN.md`. No implementation files changed in this step.
+Plan published before implementation in commit `0f611d3`. The previous `PLAN.md` is preserved as `IMPROVEMENT_PLAN.md`. No implementation files changed in this step. Baseline CI run `35999385459` passed.
 
 ### L1
 
-Added separate layer definitions, default Connections membership, top-level edge-only blocks, inline references, forward resolution, style inheritance, and line-aware validation. The existing formatter and folding code now recognize layer blocks through the shared parser helper. Added editor highlighting and 11 focused language tests.
+Commit `4c186ae` added separate layer definitions, default Connections membership, top-level edge-only blocks, inline references, forward resolution, style inheritance, and line-aware validation. The existing formatter and folding code now recognize layer blocks through the shared parser helper. Added editor highlighting and 11 focused language tests.
 
-The implementation and tests are complete for this step. Full test execution is pending CI: the local environment cannot resolve GitHub or the npm registry. The draft PR runs the existing Node 24 validation workflow. No unrun check is reported as passed.
+CI run `35999813051` passed TypeScript checks but stopped at `no-regex-spaces` in one new test. Unit tests, build, and browser tests did not run in that attempt.
+
+### L1a
+
+Replaced the indentation regex with an exact string check and simplified the escaped-label fixture with `String.raw`. CI reruns after this commit. Local dependency installation remains blocked by network name resolution; no unrun check is reported as passed.
