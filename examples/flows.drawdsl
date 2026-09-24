@@ -1,9 +1,14 @@
 direction right
+node-spacing 120
+edge-spacing 24
+
 color requestColor = #2563EB
 color eventColor = #15803D
+color auditColor = #7C3AED
 color panel = #EEF2F7
 
 aws:internet client "Client"
+
 core:group application "Application" [background=panel] {
     col 3
     aws:apigw api "API Gateway"
@@ -11,18 +16,29 @@ core:group application "Application" [background=panel] {
     aws:dynamodb data "Application data"
     aws:sqs queue "Event queue"
     aws:lambda worker "Event worker"
+    aws:cloudwatch logs "Audit logs"
 }
 
-# Unassigned edges belong to Connections.
+# Unassigned edges belong to the implicit Connections layer.
 client --> api : HTTPS
 
+# A layer can provide shared color/width defaults.
+# Chained edges inherit the containing layer.
 layer requests "Request flow" [color=requestColor, width=2] {
-    api --> handler : Invoke
-    handler --> data : Read / write
+    R:api --> L:handler --> data
 }
 
+# Layers can start hidden without changing layout or routing.
 layer events "Event flow" [color=eventColor, width=2, visible=false] {
     handler -.-> queue : Publish
     queue --> worker : Consume
-    worker --> data : Update
+
+    # Explicit edge styling overrides the layer default.
+    worker --> data [color=#0F766E, width=3] : Update
+}
+
+# Edges may reference a layer before its declaration.
+handler --> logs [layer=audit] : Write audit record
+
+layer audit "Audit flow" [color=auditColor, visible=false] {
 }

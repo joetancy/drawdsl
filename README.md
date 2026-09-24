@@ -2,7 +2,7 @@
 
 > A vibe-coded 🧑‍💻 architecture DSL that turns infrastructure ideas into editable draw.io diagrams 📐
 
-`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, and ELK orthogonal routing.
+`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, ELK orthogonal routing, and first-class connection layers for switching between data flows without duplicating the architecture.
 
 ## Quick start
 
@@ -21,7 +21,7 @@ npm run examples
 
 This generates the bundled architecture example in `examples/`.
 
-The example uses a multi-tier architecture with an AWS Region, nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles.
+The bundled examples cover multi-tier AWS architecture, nested containers, grids, routing controls, all edge styles, and connection layers with shared style defaults, hidden flows, chained edges, endpoint pinning, inline layer assignment, and native draw.io layer export.
 
 ## A tiny example
 
@@ -102,27 +102,47 @@ Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted
 Declare the architecture once, then put each data flow on a separate connection layer. Nodes and containers stay on Architecture. Unassigned edges use Connections. No plugin is required.
 
 ```text
+color requestColor = #2563EB
+color eventColor = #15803D
+
 aws:apigw api "API Gateway"
 aws:lambda handler "Request handler"
 aws:dynamodb data "Application data"
+aws:sqs queue "Event queue"
 
-layer requests "Request flow" [color=#2563EB, width=2] {
-    api --> handler : Invoke
-    handler --> data : Read / write
+# Unassigned: implicit Connections layer.
+api --> handler : HTTPS
+
+# Layer-level style defaults + chained edges + endpoint pinning.
+layer requests "Request flow" [color=requestColor, width=2] {
+    R:api --> L:handler --> data
 }
 
-layer events "Event flow" [color=#15803D, visible=false] {
-    data -.-> handler : Change event
+# Hidden-by-default flow + explicit per-edge override.
+layer events "Event flow" [color=eventColor, width=2, visible=false] {
+    handler -.-> queue : Publish
+    queue --> data [color=#0F766E, width=3] : Persist
 }
 ```
 
-Layers are top-level, edge-only blocks, not layout containers. Each edge belongs to one layer. For an edge declared elsewhere, use `api --> handler [layer=requests] : Invoke`. Forward layer references are supported. An explicit edge color or width overrides the layer default. The ID `connections` is reserved for the implicit default layer.
+Layers are top-level, edge-only metadata scopes, not layout containers. Each edge belongs to exactly one layer. Chains inherit the containing layer, and an explicit edge color or width overrides the layer default.
 
-Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without another layout pass. Nodes, routes, and labels keep their coordinates. Preview choices survive edits and theme changes, but do not change the source or export. Set `visible=false` in the DSL to save or share a hidden-by-default flow.
+Edges declared outside a layer block can use `[layer=...]`, including forward references:
 
-Exported `.drawio` files contain native layers, including hidden ones. Open the file directly in draw.io and use its Layers panel. The legacy plugin importer is outside this feature's scope.
+```text
+handler --> audit [layer=audit] : Write audit record
 
-See the [complete layer reference](docs/layers.md) and [multi-flow example](examples/flows.drawdsl).
+layer audit "Audit flow" [color=#7C3AED, visible=false] {
+}
+```
+
+The ID `connections` is reserved for the implicit default layer. Layer IDs and node IDs use separate namespaces.
+
+Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without recompiling, rerunning ELK, or rerouting edges. Nodes, waypoints, labels, zoom, and pan remain stable. Preview choices survive edits and theme changes, but do not change the source or canonical export. Use `visible=false` in the DSL when a flow should be saved or shared as initially hidden.
+
+Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. Open the file directly in draw.io and use its Layers panel.
+
+See the [complete layer reference](docs/layers.md) and the [capability example](examples/flows.drawdsl).
 
 ```bash
 npm run generate -- examples/flows.drawdsl flows.drawio
