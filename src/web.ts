@@ -1,5 +1,6 @@
 import "./web.css";
 import skillText from "../SKILL.md?raw";
+import starter from "../examples/example.drawdsl?raw";
 import { init as initRouter } from "@mr_mint/elkjs-libavoid";
 import { compileDrawDsl } from "./compiler.js";
 import { parseDsl } from "./parser.js";
@@ -12,22 +13,6 @@ import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { editorExtensions } from "./editor.js";
 import { LayerPreview } from "./layer-preview.js";
-
-const starter = `direction right
-
-aws:internet internet "Internet"
-aws:cloud cloud "AWS Cloud" {
-    aws:region region "ap-southeast-1" {
-        aws:apigw api "API Gateway"
-        aws:lambda handler "Request handler"
-        aws:dynamodb data "Application data"
-    }
-}
-
-internet --> api : HTTPS
-api --> handler
-handler --> data
-`;
 
 const source = document.querySelector<HTMLDivElement>("#source")!;
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
