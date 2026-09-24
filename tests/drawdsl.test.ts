@@ -731,12 +731,18 @@ test("the bundled DrawDSL example parses, lays out, and renders", async () => {
     const source = await readFile(new URL("../examples/example.drawdsl", import.meta.url), "utf8");
     const ast = parseDsl(source);
     const layout = await layoutDocument(ast);
-    const xml = renderDrawio(layout.nodes, layout.edges);
+    const xml = renderDrawio(layout.nodes, layout.edges, layout.layers);
     assert.equal(layout.nodes.length > 10, true);
     assert.equal(layout.edges.length > 10, true);
+    assert.deepEqual(layout.layers.map((layer) => layer.id), ["connections", "requests", "persistence", "async_jobs", "operations"]);
+    assert.deepEqual(layout.layers.map((layer) => layer.visible), [true, true, true, false, false]);
     assert.match(xml, /<mxfile/);
     assert.match(xml, /id="cloud"/);
     assert.match(xml, /id="edge:1:internet:cdn"/);
+    assert.match(xml, /id="layer:async_jobs"[^>]*visible="0"/);
+    assert.match(xml, /id="layer:operations"[^>]*visible="0"/);
+    assert.match(xml, /parent="layer:requests"/);
+    assert.match(xml, /parent="layer:persistence"/);
 });
 
 test("inherited Object.prototype names are not symbols", () => {

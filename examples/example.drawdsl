@@ -1,6 +1,12 @@
-# Example architecture using hierarchy-aware orthogonal routing.
+# Example architecture demonstrating hierarchy-aware routing and connection layers.
 direction right
-color primary = #F90
+node-spacing 120
+edge-spacing 24
+
+color request = #F90
+color async = #2563EB
+color dataflow = #15803D
+color operations = #7C3AED
 color platform = #EEF2F7
 
 aws:internet internet "Public internet"
@@ -31,7 +37,7 @@ aws:cloud cloud "AWS Cloud" {
             }
         }
 
-        core:group operations "Operations" [background=platform] {
+        core:group operations_group "Operations" [background=platform] {
             col 2
             aws:sns topic "Deployment notifications"
             aws:cloudwatch_2 monitoring "Monitoring"
@@ -40,15 +46,34 @@ aws:cloud cloud "AWS Cloud" {
     }
 }
 
-internet --> cdn [color=primary, width=2] : HTTPS
-cdn -.-> alb : cached requests
-alb --> api : forwards
-api --- lambda1 : invokes
-lambda1 -.- lambda2 : peer handoff
-lambda1 <--> data : reads and writes
-lambda2 <-.-> queue [color=primary, width=2] : async jobs
-data --> database : persists
-lambda1 --> bucket : archives
-topic --> lambda2 : notifications
-monitoring --- api : observes
-ops_note -.- app_note : runbook
+# Unassigned edges belong to the implicit Connections layer.
+internet --> cdn : DNS / HTTPS
+
+# Request path: layer defaults style the complete synchronous flow.
+# Endpoint selectors and a chained edge are both supported inside a layer.
+layer requests "Request flow" [color=request, width=2] {
+    cdn -.-> alb : cached requests
+    R:alb --> L:api --> lambda1
+}
+
+# Data flow starts visible and reuses shared nodes from the request flow.
+# The DynamoDB-to-database edge overrides the layer width.
+layer persistence "Persistence flow" [color=dataflow, width=2] {
+    lambda1 <--> data : reads and writes
+    data --> database [width=3] : replicates
+    lambda1 --> bucket : archives
+}
+
+# Async processing starts hidden but is still laid out and routed with all other edges.
+layer async_jobs "Async jobs" [color=async, width=2, visible=false] {
+    lambda1 -.- lambda2 : peer handoff
+    lambda2 <-.-> queue : async jobs
+}
+
+# An edge may reference a layer before the layer declaration.
+topic --> lambda2 [layer=operations] : notifications
+
+layer operations "Operations flow" [color=operations, visible=false] {
+    monitoring --- api : observes
+    ops_note -.- app_note : runbook
+}
