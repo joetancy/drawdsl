@@ -53,7 +53,8 @@ Commit and push this plan before implementation. For each step below, update its
 - [x] L2: Carry layer metadata through compilation; export Architecture, Connections, and named layers; test geometry and endpoint preservation.
 - [x] L2a: Fix the port-selector chain ambiguity found by the new language test.
 - [x] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
-- [ ] L4: Document the syntax and export contract, add a multi-flow example, run integration and browser regressions, and record the final results.
+- [x] L4a: Publish the layer reference, README and authoring help, multi-flow example, CLI regression, and opt-in native-viewer smoke test.
+- [ ] L4: Complete final integration and browser verification, review the change set, and record the final results.
 
 ## Verification
 
@@ -64,8 +65,9 @@ Use the existing Node 24 toolchain and test commands:
 - `npm run lint:ts`
 - `npm run web:build`
 - `npm run test:web`
+- `DRAWDSL_LIVE_VIEWER=1 npx playwright test web-tests/layers-live.spec.ts`
 
-Add focused tests with each step. Verify unknown references and malformed input, chain inheritance, style precedence, escaping and ID collisions, hidden-layer geometry invariance, nested containers, parallel flows, and layer state changes. Browser checks must cover toggling without another compile, labels hiding with edges, accessible controls, saved/shared diagrams, stale-preview errors, and a narrow viewport.
+Add focused tests with each step. Verify unknown references and malformed input, chain inheritance, style precedence, escaping and ID collisions, hidden-layer geometry invariance, nested containers, parallel flows, and layer state changes. Browser checks cover toggling without another viewer instance, labels hiding with edges, accessible controls, saved/shared diagrams, stale-preview errors, and a narrow viewport.
 
 Where the local environment cannot install the repository dependencies, use the repository CI and report its actual result. Do not report unrun checks as passed. Final delivery must name the branch, commit sequence, and any checks that could not complete.
 
@@ -93,12 +95,18 @@ CI run `36000192000` passed type checking, lint, and all six new export tests. I
 
 ### L2a
 
-Commit `90a539b` recognizes a complete edge chain before attempting the single-edge form. This prevents the colon in an intermediate port selector from becoming a label separator. The existing failing regression covers the correction.
+Commit `90a539b` recognizes a complete edge chain before attempting the single-edge form. This prevents the colon in an intermediate port selector from becoming a label separator. CI run `36000792140` passed the complete workflow, including browser tests.
 
 ### L3
 
-Added a typed viewer adapter, a separate visibility-state model, accessible connection-layer controls, and responsive styles. Current viewers change native layer visibility in place; a compatibility path redraws cached XML without invoking compilation. The adapter preserves zoom and pan during switches and ignores late callbacks from replaced previews.
+Commit `1df010e` added a typed viewer adapter, a separate visibility-state model, accessible connection-layer controls, and responsive styles. Current viewers change native layer visibility in place; a compatibility path redraws cached XML without invoking compilation. The adapter preserves zoom and pan during switches and ignores late callbacks from replaced previews.
 
 Explicit choices survive edits and theme changes. Removed layer IDs lose old overrides. Loading a saved diagram resets choices only after a successful compile. Preview errors retain the last successful graph. Exports and share links remain based on the source defaults.
 
-Added six state tests and six deterministic browser tests covering visibility, labels, geometry, viewport, canonical downloads, edits, errors, saved/shared diagrams, and keyboard operation at 375px. CI execution is pending for this step. A live-viewer integration test follows in L4.
+Added six state tests and six deterministic browser tests covering visibility, labels, geometry, viewport, canonical downloads, edits, errors, saved/shared diagrams, and keyboard operation at 375px. CI run `36001382866` passed type checking, lint, unit tests, production build, and all browser tests.
+
+### L4a
+
+Added `docs/layers.md`, a complete multi-flow example, README and in-app authoring help, and example/CLI integration tests. Added a separate native-viewer smoke test that checks rendered labels, geometry, edge membership, and viewer instance stability. The workflow enables that test with network access and saves desktop/mobile screenshots and failure traces as `browser-test-evidence`.
+
+Final checks for this step are pending. The default browser suite keeps the live test opt-in so local deterministic tests do not require the remote viewer.

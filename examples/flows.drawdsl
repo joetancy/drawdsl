@@ -1,0 +1,28 @@
+direction right
+color requestColor = #2563EB
+color eventColor = #15803D
+color panel = #EEF2F7
+
+aws:internet client "Client"
+core:group application "Application" [background=panel] {
+    col 3
+    aws:apigw api "API Gateway"
+    aws:lambda handler "Request handler"
+    aws:dynamodb data "Application data"
+    aws:sqs queue "Event queue"
+    aws:lambda worker "Event worker"
+}
+
+# Unassigned edges belong to Connections.
+client --> api : HTTPS
+
+layer requests "Request flow" [color=requestColor, width=2] {
+    api --> handler : Invoke
+    handler --> data : Read / write
+}
+
+layer events "Event flow" [color=eventColor, width=2, visible=false] {
+    handler -.-> queue : Publish
+    queue --> worker : Consume
+    worker --> data : Update
+}
