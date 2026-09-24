@@ -118,6 +118,7 @@ export type RoutedEdge = AstEdge & {
 export type LayoutResult = {
     nodes: FlatLayoutNode[];
     edges: RoutedEdge[];
+    layers: AstLayer[];
 };
 
 export function symbolKey(ref: SymbolRef): string {
