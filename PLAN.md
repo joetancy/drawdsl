@@ -54,7 +54,7 @@ Commit and push this plan before implementation. For each step below, update its
 - [x] L2a: Fix the port-selector chain ambiguity found by the new language test.
 - [x] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
 - [x] L4a: Publish the layer reference, README and authoring help, multi-flow example, CLI regression, and opt-in native-viewer smoke test.
-- [ ] L4: Complete final integration and browser verification, review the change set, and record the final results.
+- [x] L4: Complete final integration and browser verification, review the change set, and record the final results.
 
 ## Verification
 
@@ -109,4 +109,20 @@ Added six state tests and six deterministic browser tests covering visibility, l
 
 Added `docs/layers.md`, a complete multi-flow example, README and in-app authoring help, and example/CLI integration tests. Added a separate native-viewer smoke test that checks rendered labels, geometry, edge membership, and viewer instance stability. The workflow enables that test with network access and saves desktop/mobile screenshots and failure traces as `browser-test-evidence`.
 
-Final checks for this step are pending. The default browser suite keeps the live test opt-in so local deterministic tests do not require the remote viewer.
+CI run `36002014456` completed successfully. `npm run check`, `npm run lint:ts`, `npm test`, `npm run web:build`, `npm run test:web`, and the opt-in native viewer test all passed. The default browser suite reported 26 passed and 1 intentionally skipped live-viewer test; the separate live-viewer run passed. The workflow also uploaded desktop/mobile browser evidence. The default browser suite keeps the live test opt-in so local deterministic tests do not require the remote viewer.
+
+
+### L4
+
+Final integration review completed after CI run `36002014456`.
+
+- TypeScript check: passed.
+- ESLint: passed.
+- Unit and CLI tests: 80 passed, 0 failed.
+- Production web build: passed.
+- Deterministic browser suite: 26 passed, 1 intentionally skipped live-viewer test.
+- Native diagrams.net viewer smoke test: 1 passed.
+- Browser evidence artifact: uploaded successfully.
+- Pull request remained mergeable after the final change-set review.
+
+All planned connection-layer work is complete. No draw.io plugin implementation was added. The feature remains scoped to the standalone DrawDSL editor, compiler/CLI, and native `.drawio` export.
