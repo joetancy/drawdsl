@@ -20,7 +20,7 @@ test("the multi-flow example formats, parses and compiles with all layers", asyn
     assert.deepEqual(ast.layers.map((layer) => layer.visible), [true, true, false, false]);
     const xml = await compileDrawDsl(source);
     assert.match(xml, /id="layer:events"[^>]*visible="0"/);
-        assert.match(xml, /id="layer:audit"[^>]*visible="0"/);
+    assert.match(xml, /id="layer:audit"[^>]*visible="0"/);
     assert.equal((xml.match(/edge="1"/g) ?? []).length, 7);
 });
 
