@@ -11,12 +11,7 @@ import { foldAll, unfoldAll, unfoldEffect } from "@codemirror/language";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { editorExtensions } from "./editor.js";
-
-declare global {
-    interface Window {
-        GraphViewer?: { processElements(): void };
-    }
-}
+import { LayerPreview } from "./layer-preview.js";
 
 const starter = `direction right
 
@@ -37,6 +32,7 @@ handler --> data
 const source = document.querySelector<HTMLDivElement>("#source")!;
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
+const layerPreview = new LayerPreview(preview);
 const previewStatus = document.querySelector<HTMLSpanElement>("#preview-status")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
@@ -233,6 +229,7 @@ function downloadFile(filename: string, content: string, mime: string): void {
 
 function loadSavedDiagram(diagram: SavedDiagram): void {
     if (isDirtyForLoad() && !confirm(`Discard unsaved changes and load "${diagram.name}"?`)) return;
+    layerPreview.resetForNextDocument();
     setLoadedDiagram(diagram);
     savedSnapshot = diagram.source;
     showingXml = false;
@@ -310,17 +307,7 @@ function markSourceChanged(): void {
 }
 
 function showPreview(xml: string): void {
-    const graph = document.createElement("div");
-    graph.className = "mxgraph";
-    graph.dataset.mxgraph = JSON.stringify({
-        xml,
-        nav: true,
-        resize: true,
-        toolbar: "zoom",
-        "dark-mode": darkMode ? "dark" : "light",
-    });
-    preview.replaceChildren(graph);
-    window.GraphViewer?.processElements();
+    layerPreview.show(xml, darkMode);
 }
 
 async function render(): Promise<void> {
@@ -367,6 +354,7 @@ async function render(): Promise<void> {
 }
 
 function showPreviewFallback(titleText: string, messageText: string): void {
+    layerPreview.clear();
     const fallback = document.createElement("div");
     fallback.className = "preview-fallback";
     const icon = document.createElement("span");
@@ -601,7 +589,7 @@ themeToggle.addEventListener("click", () => {
     setButtonLabel(themeToggle, darkMode ? "Light theme" : "Dark theme");
     themeToggle.setAttribute("aria-pressed", String(darkMode));
     setEditorMode();
-    if (lastGoodXml) showPreview(lastGoodXml);
+    if (lastGoodXml) layerPreview.redraw(darkMode);
 });
 view.dom.addEventListener("click", () => updateEditor());
 view.dom.addEventListener("input", () => {

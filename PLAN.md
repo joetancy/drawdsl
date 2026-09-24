@@ -52,7 +52,7 @@ Commit and push this plan before implementation. For each step below, update its
 - [x] L1a: Correct the test lint issue found by CI and simplify the escaped-label fixture.
 - [x] L2: Carry layer metadata through compilation; export Architecture, Connections, and named layers; test geometry and endpoint preservation.
 - [x] L2a: Fix the port-selector chain ambiguity found by the new language test.
-- [ ] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
+- [x] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
 - [ ] L4: Document the syntax and export contract, add a multi-flow example, run integration and browser regressions, and record the final results.
 
 ## Verification
@@ -93,4 +93,12 @@ CI run `36000192000` passed type checking, lint, and all six new export tests. I
 
 ### L2a
 
-The parser now recognizes a complete edge chain before attempting the single-edge form. This prevents the colon in an intermediate port selector from becoming a label separator. The existing failing regression covers the correction. The next CI run verifies the result.
+Commit `90a539b` recognizes a complete edge chain before attempting the single-edge form. This prevents the colon in an intermediate port selector from becoming a label separator. The existing failing regression covers the correction.
+
+### L3
+
+Added a typed viewer adapter, a separate visibility-state model, accessible connection-layer controls, and responsive styles. Current viewers change native layer visibility in place; a compatibility path redraws cached XML without invoking compilation. The adapter preserves zoom and pan during switches and ignores late callbacks from replaced previews.
+
+Explicit choices survive edits and theme changes. Removed layer IDs lose old overrides. Loading a saved diagram resets choices only after a successful compile. Preview errors retain the last successful graph. Exports and share links remain based on the source defaults.
+
+Added six state tests and six deterministic browser tests covering visibility, labels, geometry, viewport, canonical downloads, edits, errors, saved/shared diagrams, and keyboard operation at 375px. CI execution is pending for this step. A live-viewer integration test follows in L4.
