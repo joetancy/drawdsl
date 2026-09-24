@@ -194,7 +194,10 @@ export function parseDsl(source: string): DocumentAst {
             stack.pop();
             continue;
         }
-        if (activeLayer && !EDGE_RE.test(line) && !parseEdgeChain(line)) throw new DslError(`Line ${lineNumber}: only edges are allowed inside layer ${activeLayer.id}`, lineNumber);
+        // Parse a complete chain first: a selector colon is not an edge label separator.
+        const chain = parseEdgeChain(line);
+        const edgeMatch = chain ? null : line.match(EDGE_RE);
+        if (activeLayer && !edgeMatch && !chain) throw new DslError(`Line ${lineNumber}: only edges are allowed inside layer ${activeLayer.id}`, lineNumber);
         const colorMatch = line.match(COLOR_DECL_RE);
         if (colorMatch) {
             if (stack.length) throw new DslError(`Line ${lineNumber}: color constants must be top-level`, lineNumber);
@@ -251,7 +254,6 @@ export function parseDsl(source: string): DocumentAst {
             }
             continue;
         }
-        const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
             const options = edgeOptions(edgeMatch[6], colors, lineNumber);
             if (activeLayer && options.layerId !== undefined && options.layerId !== activeLayer.id) throw new DslError(`Line ${lineNumber}: edge layer ${options.layerId} conflicts with containing layer ${activeLayer.id}`, lineNumber);
@@ -270,7 +272,6 @@ export function parseDsl(source: string): DocumentAst {
             });
             continue;
         }
-        const chain = parseEdgeChain(line);
         if (chain) {
             for (let position = 1; position < chain.length; position += 1) {
                 const source = chain[position - 1]!;

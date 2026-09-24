@@ -51,6 +51,7 @@ Commit and push this plan before implementation. For each step below, update its
 - [x] L1: Add the layer model, parser, validation, formatter/folding support, editor syntax support, and focused language tests.
 - [x] L1a: Correct the test lint issue found by CI and simplify the escaped-label fixture.
 - [x] L2: Carry layer metadata through compilation; export Architecture, Connections, and named layers; test geometry and endpoint preservation.
+- [x] L2a: Fix the port-selector chain ambiguity found by the new language test.
 - [ ] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
 - [ ] L4: Document the syntax and export contract, add a multi-flow example, run integration and browser regressions, and record the final results.
 
@@ -82,10 +83,14 @@ CI run `35999813051` passed TypeScript checks but stopped at `no-regex-spaces` i
 
 ### L1a
 
-Commit `ae83f33` replaced the indentation regex with an exact string check and simplified the escaped-label fixture with `String.raw`. CI reruns after that commit. Local dependency installation remains blocked by network name resolution; no unrun check is reported as passed.
+Commit `ae83f33` replaced the indentation regex with an exact string check and simplified the escaped-label fixture with `String.raw`. Local dependency installation remains blocked by network name resolution; no unrun check is reported as passed.
 
 ### L2
 
-Layer metadata now passes through the layout result and compiler. The renderer creates root-level Architecture, Connections, and named layers, including initial visibility. Every edge has a connection-layer parent. Node containment, endpoint IDs, and waypoint coordinates are unchanged. Low-level render calls without explicit layers still work for ordinary connections.
+Commit `10429c3` carries layer metadata through layout and compilation. The renderer creates root-level Architecture, Connections, and named layers, including initial visibility. Every edge has a connection-layer parent. Node containment, endpoint IDs, and waypoint coordinates are unchanged.
 
-Added six export tests: native layer structure, hidden-versus-visible geometry equality, nested node coordinates and waypoints, parallel flows and ID separation, title escaping, and invalid low-level layer references. Execution results will be recorded from CI.
+CI run `36000192000` passed type checking, lint, and all six new export tests. In total, 71 of 72 unit tests passed. The remaining failure was a port-selector chain being parsed as a single edge with a label. Build and browser tests were skipped after that failure.
+
+### L2a
+
+The parser now recognizes a complete edge chain before attempting the single-edge form. This prevents the colon in an intermediate port selector from becoming a label separator. The existing failing regression covers the correction. The next CI run verifies the result.
