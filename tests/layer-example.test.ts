@@ -16,11 +16,12 @@ test("the multi-flow example formats, parses and compiles with all layers", asyn
     const source = await readFile(example, "utf8");
     assert.equal(formatDsl(source), source);
     const ast = parseDsl(source);
-    assert.deepEqual(ast.layers.map((layer) => layer.id), ["connections", "requests", "events"]);
-    assert.deepEqual(ast.layers.map((layer) => layer.visible), [true, true, false]);
+    assert.deepEqual(ast.layers.map((layer) => layer.id), ["connections", "requests", "events", "audit"]);
+    assert.deepEqual(ast.layers.map((layer) => layer.visible), [true, true, false, false]);
     const xml = await compileDrawDsl(source);
     assert.match(xml, /id="layer:events"[^>]*visible="0"/);
-    assert.equal((xml.match(/edge="1"/g) ?? []).length, 6);
+        assert.match(xml, /id="layer:audit"[^>]*visible="0"/);
+    assert.equal((xml.match(/edge="1"/g) ?? []).length, 7);
 });
 
 test("CLI generation and validation preserve named layers", async () => {
@@ -32,6 +33,7 @@ test("CLI generation and validation preserve named layers", async () => {
         const xml = await readFile(output, "utf8");
         assert.match(xml, /parent="layer:requests"/);
         assert.match(xml, /parent="layer:events"/);
+        assert.match(xml, /parent="layer:audit"/);
         assert.match(xml, /parent="layer:connections"/);
         assert.match(xml, /id="layer:events"[^>]*visible="0"/);
     } finally {
