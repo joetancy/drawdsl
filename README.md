@@ -2,7 +2,7 @@
 
 > A vibe-coded 🧑‍💻 architecture DSL that turns infrastructure ideas into editable draw.io diagrams 📐
 
-`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, and ELK orthogonal routing.
+`drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, ELK orthogonal routing, and first-class connection layers for switching between data flows without duplicating the architecture.
 
 ## Quick start
 
@@ -21,7 +21,7 @@ npm run examples
 
 This generates the bundled architecture example in `examples/`.
 
-The example uses a multi-tier architecture with an AWS Region, nested VPCs, public and private subnets, Lambda, API Gateway, queues, databases, operational services, text resources, and all supported edge styles.
+The bundled examples cover multi-tier AWS architecture, nested containers, grids, routing controls, all edge styles, and connection layers with shared style defaults, hidden flows, chained edges, endpoint pinning, inline layer assignment, and native draw.io layer export.
 
 ## A tiny example
 
@@ -49,7 +49,7 @@ aws:cloud cloud "AWS Cloud" {
 internet --> handler : HTTPS
 ```
 
-Every declaration uses `namespace:name`. The namespace selects a symbol provider; the optional ID and quoted label follow it. IDs are unnamespaced and global within the document.
+Every resource declaration uses `namespace:name`. The namespace selects a symbol provider; the optional ID and quoted label follow it. Node IDs are unnamespaced and global within the document. Connection layer IDs use a separate namespace.
 
 Connections support solid, dashed, directed, undirected, and bidirectional operators:
 
@@ -69,7 +69,7 @@ lambda_main --> B:notifications_queue  # enter the queue from its bottom
 R:lambda_main --> T:notifications_queue
 ```
 
-These selectors mean top, right, bottom, and left respectively. They are honored by ELK’s router and preserved in draw.io.
+These selectors mean top, right, bottom, and left respectively. They are honored by the router and preserved in draw.io.
 
 Set an edge's color and width with bracketed options. Hex colors accept `#RGB` and `#RRGGBB`; define a named color once and reuse it:
 
@@ -82,7 +82,7 @@ target -.-> source [color=alert]
 source --- target [color=#123ABC, width=2]
 ```
 
-Color constants must be declared at document level before use. Edge width is a positive integer from 1 to 10000 and defaults to 1; edge color defaults to draw.io's default.
+Color constants must be declared at document level before use. Edge width is a positive integer from 1 to 10000. An edge can inherit its color and width from a connection layer. Without an edge or layer default, width is 1 and color is draw.io's default.
 
 Set a `core:group` background using the same constants or a hex value:
 
@@ -96,6 +96,57 @@ core:group services "Services" [background=panel] {
 ```
 
 Labels support `\"`, `\\`, and `\n` escapes. `#` starts a comment outside quoted labels except when it begins a hex color value. Unqualified declarations such as `lambda handler` are intentionally rejected.
+
+## Connection layers
+
+Declare the architecture once, then put each data flow on a separate connection layer. Nodes and containers stay on Architecture. Unassigned edges use Connections. No plugin is required.
+
+```text
+color requestColor = #2563EB
+color eventColor = #15803D
+
+aws:apigw api "API Gateway"
+aws:lambda handler "Request handler"
+aws:dynamodb data "Application data"
+aws:sqs queue "Event queue"
+
+# Unassigned: implicit Connections layer.
+api --> handler : HTTPS
+
+# Layer-level style defaults + chained edges + endpoint pinning.
+layer requests "Request flow" [color=requestColor, width=2] {
+    R:api --> L:handler --> data
+}
+
+# Hidden-by-default flow + explicit per-edge override.
+layer events "Event flow" [color=eventColor, width=2, visible=false] {
+    handler -.-> queue : Publish
+    queue --> data [color=#0F766E, width=3] : Persist
+}
+```
+
+Layers are top-level, edge-only metadata scopes, not layout containers. Each edge belongs to exactly one layer. Chains inherit the containing layer, and an explicit edge color or width overrides the layer default.
+
+Edges declared outside a layer block can use `[layer=...]`, including forward references:
+
+```text
+handler --> audit [layer=audit] : Write audit record
+
+layer audit "Audit flow" [color=#7C3AED, visible=false] {
+}
+```
+
+The ID `connections` is reserved for the implicit default layer. Layer IDs and node IDs use separate namespaces.
+
+Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without recompiling, rerunning ELK, or rerouting edges. Nodes, waypoints, labels, zoom, and pan remain stable. Preview choices survive edits and theme changes, but do not change the source or canonical export. Use `visible=false` in the DSL when a flow should be saved or shared as initially hidden.
+
+Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. Open the file directly in draw.io and use its Layers panel.
+
+See the [complete layer reference](docs/layers.md) and the [capability example](examples/flows.drawdsl).
+
+```bash
+npm run generate -- examples/flows.drawdsl flows.drawio
+```
 
 ## Built-in symbol providers
 
@@ -178,9 +229,11 @@ core:layout application_grid {
 
 `direction` accepts `right`, `left`, `down`, or `up`. `node-spacing`, `layer-spacing`, and `edge-spacing` accept integer pixel values from 1 to 10000; `padding` accepts 0 to 10000 and applies equally to all four sides. `col` accepts 1 to 10000 and must be inside a container with at least one child. `edge-spacing` is document-only. Each directive may be set only once per document or container; duplicates fail. Partial configuration is supported.
 
+`layer-spacing` controls ELK layout ranks, not connection visibility layers.
+
 Labels support `\n`, `\"`, and `\\` escapes, including literal multiline quoted labels; CRLF line endings parse like LF. Errors report the offending source line in both the CLI and the playground, where a Go-to-line button focuses the editor.
 
-When omitted, root nodes use 240px spacing, resources inside containers use 80px, container-only siblings use 160px, layers use 240px, and routed edge lanes use 20px. Root padding is 40px; visible containers use 40px vertically and 80px horizontally; invisible `core:layout` containers have no padding. Explicit document-level `node-spacing` or `padding` replaces these tiered defaults.
+When omitted, root nodes use 240px spacing, resources inside containers use 80px, container-only siblings use 160px, layout ranks use 240px, and routed edge lanes use 20px. Root padding is 40px; visible containers use 40px vertically and 80px horizontally; invisible `core:layout` containers have no padding. Explicit document-level `node-spacing` or `padding` replaces these tiered defaults.
 
 Containers can also override the document flow direction for their non-grid children:
 
@@ -228,16 +281,22 @@ npm run check
 npm test
 ```
 
-Browser regressions run against the production build with a stubbed diagrams.net viewer:
+Browser regressions run against the production build. The default suite uses a stubbed diagrams.net viewer for repeatable app and adapter checks:
 
 ```bash
 npm run web:build
 npm run test:web
 ```
 
-The stub covers app state (compile, save, links, clipboard, keyboard, layout) but cannot prove diagram rendering. For viewer integration, build and serve the app with network access, load a representative diagram, and confirm the preview renders without console errors.
+A separate smoke test loads the native viewer. It needs network access:
 
-The test suite covers parsing, namespace resolution, layout, routing, formatting, provider styles, and draw.io rendering.
+```bash
+DRAWDSL_LIVE_VIEWER=1 npx playwright test web-tests/layers-live.spec.ts
+```
+
+CI runs both suites. The native test checks real edge labels and layer switches and saves desktop and mobile screenshots. Screenshots and failure traces are available in the `browser-test-evidence` artifact.
+
+The test suite covers parsing, namespace resolution, layout, routing, formatting, provider styles, connection layers, and draw.io rendering.
 
 ## Web playground
 
@@ -258,7 +317,7 @@ The repository deploys the playground to `https://joetancy.github.io/drawdsl/` o
 
 Use **Copy share link** to copy a self-contained link to the current DSL. The playground stores the diagram in the URL fragment, compressing it when that produces a shorter link; no diagram data is sent to or stored by a backend. The URL updates three seconds after you stop typing, while the copy button always creates the current link immediately. Anyone with the link can read its contents, so do not include secrets. Compressed links use `#v=1&z=...` and take precedence over legacy `#dsl=...` links; unsupported versions are rejected. Share imports are limited to 1 MiB encoded and 2 MiB decoded DSL.
 
-The editor highlights DSL syntax and reports errors inline, with a Go-to-line button for diagnostics. Containers collapse via the fold gutter chevrons (or **Fold all**); folded lines stay part of the diagram. Use **Format DrawDSL** to normalize indentation, **Show draw.io XML** to inspect the generated output (with **Copy draw.io XML** to copy it), and **Dark mode** to toggle the preview theme. **Download .drawdsl** saves the exact current source (even invalid drafts) and **Download .drawio** saves the current successful output; failed compiles cannot download stale XML. Filenames reuse the loaded diagram name with a safe fallback. **DSL guide** and **SKILL.md** open the authoring help; the skill text is loaded from `SKILL.md` and can be copied for LLM-assisted diagramming.
+The editor highlights DSL syntax and reports errors inline, with a Go-to-line button for diagnostics. Containers and connection layer blocks collapse via the fold gutter chevrons (or **Fold all**); folded lines stay part of the diagram. Use **Format DrawDSL** to normalize indentation, **Show draw.io XML** to inspect the generated output (with **Copy draw.io XML** to copy it), and **Dark mode** to toggle the preview theme. **Download .drawdsl** saves the exact current source (even invalid drafts) and **Download .drawio** saves the current successful output; failed compiles cannot download stale XML. Filenames reuse the loaded diagram name with a safe fallback. **DSL guide** and **SKILL.md** open the authoring help; the skill text is loaded from `SKILL.md` and can be copied for LLM-assisted diagramming.
 
 Use **Saved** to keep named diagrams in this browser's local storage (via **Save copy**, with **Save** updating the loaded diagram). Saved diagrams stay on the device until deleted and are never sent anywhere.
 

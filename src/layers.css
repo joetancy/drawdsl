@@ -1,0 +1,12 @@
+.preview-pane.with-flow-layers { grid-template-rows: auto auto minmax(0, 1fr); }
+.connection-layers { min-width: 0; max-height: 190px; overflow: auto; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-primary); }
+.connection-layers[hidden] { display: none; }
+.connection-layers legend { padding: 0 5px; font-size: 12px; font-weight: 600; }
+.layer-actions, .layer-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.layer-actions { margin-bottom: 10px; }
+.layer-actions button { min-height: 32px; padding: 5px 10px; font-size: 12px; }
+.layer-choices label { display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; }
+.layer-choices label > span { overflow-wrap: anywhere; }
+.layer-choices input { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.layer-count { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.layer-note { margin: 9px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }

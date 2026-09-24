@@ -30,6 +30,17 @@ jobs:
       - run: npm run web:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:web
+      - name: Verify native viewer layers
+        run: npx playwright test web-tests/layers-live.spec.ts
+        env:
+          DRAWDSL_LIVE_VIEWER: "1"
+      - name: Save browser test evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: browser-test-evidence
+          path: test-results/
+          if-no-files-found: ignore
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

@@ -1,4 +1,4 @@
-import { isRenderable, type FlatLayoutNode, type NodeSide, type Point, type RoutedEdge } from "../model.js";
+import { CONNECTIONS_LAYER_ID, isRenderable, type AstLayer, type FlatLayoutNode, type NodeSide, type Point, type RoutedEdge } from "../model.js";
 
 function xmlEscape(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
@@ -52,11 +52,24 @@ function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string
     return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", `strokeWidth=${edge.width ?? 1}`, ...(edge.color ? [`strokeColor=${edge.color}`] : []), `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
 }
 
-export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
+export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = []): string {
+    const connectionLayers = [...layers];
+    if (!connectionLayers.some((layer) => layer.id === CONNECTIONS_LAYER_ID)) {
+        connectionLayers.unshift({ id: CONNECTIONS_LAYER_ID, label: "Connections", visible: true, declarationOrder: -1 });
+    }
+    connectionLayers.sort((a, b) => a.declarationOrder - b.declarationOrder);
+    const layerIds = new Set(connectionLayers.map((layer) => layer.id));
+    if (layerIds.size !== connectionLayers.length) throw new Error("Duplicate connection layer ID");
+    for (const edge of edges) {
+        if (!layerIds.has(edge.layerId ?? CONNECTIONS_LAYER_ID)) throw new Error(`Unknown edge layer: ${edge.layerId}`);
+    }
     const lines = [
         '<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
-        "  <root>", '    <mxCell id="0"/>', '    <mxCell id="1" parent="0"/>',
+        "  <root>", '    <mxCell id="0"/>', '    <mxCell id="1" value="Architecture" parent="0"/>',
     ];
+    for (const layer of connectionLayers) {
+        lines.push(`    <mxCell id="${xmlEscape(`layer:${layer.id}`)}" value="${xmlEscape(layer.label)}" parent="0" visible="${layer.visible ? "1" : "0"}"/>`);
+    }
     const ordered = nodes.filter(isRenderable).sort((a, b) => Number(b.definition.role === "container") - Number(a.definition.role === "container") || a.declarationOrder - b.declarationOrder);
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const parentFor = (node: FlatLayoutNode): FlatLayoutNode | undefined => {
@@ -72,7 +85,8 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[])
         lines.push(`      <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "    </mxCell>");
     }
     for (const edge of edges) {
-        lines.push(`    <mxCell id="${xmlEscape(edge.id)}" value="${labelForXml(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="1" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '      <mxGeometry relative="1" as="geometry">');
+        const parent = `layer:${edge.layerId ?? CONNECTIONS_LAYER_ID}`;
+        lines.push(`    <mxCell id="${xmlEscape(edge.id)}" value="${labelForXml(edge.label ?? "")}" style="${xmlEscape(edgeStyle(edge, byId))}" edge="1" parent="${xmlEscape(parent)}" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}">`, '      <mxGeometry relative="1" as="geometry">');
         if (edge.points.length) {
             lines.push('        <Array as="points">');
             for (const point of edge.points) lines.push(`          <mxPoint x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}"/>`);
@@ -84,7 +98,7 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[])
     return `${lines.join("\n")}\n`;
 }
 
-export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[]): string {
-    const model = renderMxGraphModel(nodes, edges);
+export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = []): string {
+    const model = renderMxGraphModel(nodes, edges, layers);
     return `<?xml version="1.0" encoding="UTF-8"?>\n<mxfile host="app.diagrams.net" agent="drawdsl" version="26.0.0" type="device">\n  <diagram id="drawdsl" name="Architecture">\n${model.split("\n").map((line) => `    ${line}`).join("\n")}\n  </diagram>\n</mxfile>\n`;
 }

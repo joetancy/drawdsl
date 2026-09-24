@@ -5,6 +5,18 @@ export type NodeSide = "top" | "right" | "bottom" | "left";
 export type EdgeOperator = "-->" | "-.->" | "---" | "-.-" | "<-->" | "<-.->";
 export type SymbolRole = "resource" | "container" | "annotation";
 
+export const CONNECTIONS_LAYER_ID = "connections";
+
+export type AstLayer = {
+    id: string;
+    label: string;
+    visible: boolean;
+    color?: string;
+    width?: number;
+    declarationOrder: number;
+    line?: number;
+};
+
 export class DslError extends Error {
     line?: number;
     constructor(message: string, line?: number) {
@@ -68,6 +80,8 @@ export type AstEdge = {
     label?: string;
     color?: string;
     width?: number;
+    /** Defaults to Connections for callers that construct edges directly. */
+    layerId?: string;
     declarationOrder: number;
     line?: number;
 };
@@ -76,6 +90,7 @@ export type DocumentAst = {
     layout: LayoutConfig;
     nodes: AstNode[];
     edges: AstEdge[];
+    layers: AstLayer[];
 };
 
 export type Point = { x: number; y: number };
@@ -103,6 +118,7 @@ export type RoutedEdge = AstEdge & {
 export type LayoutResult = {
     nodes: FlatLayoutNode[];
     edges: RoutedEdge[];
+    layers: AstLayer[];
 };
 
 export function symbolKey(ref: SymbolRef): string {

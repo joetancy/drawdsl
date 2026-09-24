@@ -5,7 +5,7 @@ import type { Extension, Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { computeFoldRegions } from "./fold.js";
 
-const directives = /^(direction|layout|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
+const directives = /^(direction|layout|layer|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
 const operators = /^(<-->|<-\.->|-->|-\.->|---|-\.-)$/;
 const highlightStyles = [
     HighlightStyle.define([
@@ -35,7 +35,7 @@ const dsl = StreamLanguage.define({
     token(stream, state) {
         if (stream.sol()) state.first = true;
         if (stream.eatSpace()) return null;
-        if (stream.match(/^#(?:[\da-f]{3}|[\da-f]{6})(?=\s|$)/i)) return "number";
+        if (stream.match(/^#(?:[\da-f]{3}|[\da-f]{6})(?=\s|$|[,\]])/i)) return "number";
         if (stream.match(/#.*/)) return "comment";
         if (stream.match(/"(?:\\.|[^"\\])*"?/)) { state.first = false; return "string"; }
         const match = stream.match(/^(?:<-->|<-\.->|-->|-\.->|---|-\.-|[TRBLtrbl]:|[A-Za-z_][\w-]*:[A-Za-z_][\w-]*|[A-Za-z_][\w-]*|\d+|[{}]|.)/);
