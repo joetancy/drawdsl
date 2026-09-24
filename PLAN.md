@@ -48,7 +48,7 @@ Also support `api --> handler [layer=requests] : HTTPS` outside a layer block. R
 Commit and push this plan before implementation. For each step below, update its checkbox and verification notes in the same commit as the implementation, then push the branch before starting the next step. Record any later corrections in separate commits.
 
 - [x] P00: Publish this plan and preserve the previous backlog.
-- [ ] L1: Add the layer model, parser, validation, formatter/folding support, editor syntax support, and focused language tests.
+- [x] L1: Add the layer model, parser, validation, formatter/folding support, editor syntax support, and focused language tests.
 - [ ] L2: Carry layer metadata through compilation; export Architecture, Connections, and named layers; test geometry and endpoint preservation.
 - [ ] L3: Add standalone preview controls for individual layers, All flows, Architecture only, and default visibility. Switch visibility without recompilation and cover view-state transitions.
 - [ ] L4: Document the syntax and export contract, add a multi-flow example, run integration and browser regressions, and record the final results.
@@ -71,4 +71,10 @@ Where the local environment cannot install the repository dependencies, use the 
 
 ### P00
 
-Plan published before implementation. The previous `PLAN.md` is preserved as `IMPROVEMENT_PLAN.md`. No implementation files changed in this step.
+Plan published before implementation in commit `0f611d3`. The previous `PLAN.md` is preserved as `IMPROVEMENT_PLAN.md`. No implementation files changed in this step.
+
+### L1
+
+Added separate layer definitions, default Connections membership, top-level edge-only blocks, inline references, forward resolution, style inheritance, and line-aware validation. The existing formatter and folding code now recognize layer blocks through the shared parser helper. Added editor highlighting and 11 focused language tests.
+
+The implementation and tests are complete for this step. Full test execution is pending CI: the local environment cannot resolve GitHub or the npm registry. The draft PR runs the existing Node 24 validation workflow. No unrun check is reported as passed.

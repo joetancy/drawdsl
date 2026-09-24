@@ -1,4 +1,4 @@
-import { DslError, isRenderable, type AstEdge, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type NodeSide, type SymbolRef } from "./model.js";
+import { CONNECTIONS_LAYER_ID, DslError, isRenderable, type AstEdge, type AstLayer, type AstNode, type Direction, type DocumentAst, type EdgeOperator, type NodeSide, type SymbolRef } from "./model.js";
 import { layoutNumber, normalizeLayoutConfig, type ContainerLayoutOptions, type ParsedLayoutConfig } from "./config.js";
 import { qualifiedCandidates, resolveSymbol } from "./symbols/registry.js";
 
@@ -10,6 +10,7 @@ const DEFAULT_LAYOUT_RE = /^layout\s+elk$/;
 const GRID_COLUMNS_RE = /^(col|grid-columns)\s+(\S+)$/;
 const LAYOUT_SETTING_RE = /^(node-spacing|layer-spacing|edge-spacing|padding)(?:\s+(.*))?$/;
 const COLOR_DECL_RE = /^color\s+([A-Za-z_][\w-]*)\s*=\s*(#\S+)$/;
+const LAYER_RE = /^layer\s+([A-Za-z_][\w-]*)(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*\{$/;
 const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
@@ -36,7 +37,7 @@ export function hasUnclosedQuote(line: string): boolean {
 }
 
 export function isBlockOpener(code: string): boolean {
-    return Boolean(code.match(DECLARATION_RE)?.[6]);
+    return Boolean(code.match(DECLARATION_RE)?.[6]) || LAYER_RE.test(code);
 }
 
 function unescapeQuoted(value: string): string {
@@ -68,14 +69,22 @@ function colorValue(value: string, colors: Map<string, string>): string | undefi
     return hexColor(value) ?? colors.get(value);
 }
 
-function edgeOptions(raw: string | undefined, colors: Map<string, string>, lineNumber: number): { color?: string; width?: number } {
+type EdgeOptions = Pick<AstEdge, "color" | "width" | "layerId">;
+
+function edgeOptions(raw: string | undefined, colors: Map<string, string>, lineNumber: number): EdgeOptions {
     if (raw === undefined) return {};
-    const result: { color?: string; width?: number } = {};
+    const result: EdgeOptions = {};
     for (const option of raw.split(",")) {
-        const match = option.trim().match(/^(color|width)\s*=\s*(\S+)$/);
+        const match = option.trim().match(/^(color|width|layer)\s*=\s*(\S+)$/);
         if (!match) throw new DslError(`Line ${lineNumber}: invalid edge option: ${option.trim()}`, lineNumber);
         const key = match[1]!;
         const value = match[2]!;
+        if (key === "layer") {
+            if (result.layerId !== undefined) throw new DslError(`Line ${lineNumber}: duplicate edge layer`, lineNumber);
+            if (!/^[A-Za-z_][\w-]*$/.test(value)) throw new DslError(`Line ${lineNumber}: invalid layer ID: ${value}`, lineNumber);
+            result.layerId = value;
+            continue;
+        }
         if (key === "width") {
             if (result.width !== undefined) throw new DslError(`Line ${lineNumber}: duplicate edge width`, lineNumber);
             result.width = layoutNumber("edge-width", value, lineNumber);
@@ -85,6 +94,27 @@ function edgeOptions(raw: string | undefined, colors: Map<string, string>, lineN
         const color = colorValue(value, colors);
         if (!color) throw new DslError(`Line ${lineNumber}: invalid or unknown edge color: ${value}`, lineNumber);
         result.color = color;
+    }
+    return result;
+}
+
+function layerOptions(raw: string | undefined, colors: Map<string, string>, lineNumber: number): Pick<AstLayer, "color" | "width" | "visible"> {
+    const result: Pick<AstLayer, "color" | "width" | "visible"> = { visible: true };
+    const seen = new Set<string>();
+    if (raw === undefined) return result;
+    for (const option of raw.split(",")) {
+        const match = option.trim().match(/^(color|width|visible)\s*=\s*(\S+)$/);
+        if (!match) throw new DslError(`Line ${lineNumber}: invalid layer option: ${option.trim()}`, lineNumber);
+        const key = match[1]!;
+        const value = match[2]!;
+        if (seen.has(key)) throw new DslError(`Line ${lineNumber}: duplicate layer ${key}`, lineNumber);
+        seen.add(key);
+        if (key === "visible") {
+            if (value !== "true" && value !== "false") throw new DslError(`Line ${lineNumber}: layer visible must be true or false`, lineNumber);
+            result.visible = value === "true";
+        } else {
+            Object.assign(result, edgeOptions(option, colors, lineNumber));
+        }
     }
     return result;
 }
@@ -121,6 +151,8 @@ function parseSymbol(raw: string, lineNumber: number): { ref: SymbolRef; definit
 export function parseDsl(source: string): DocumentAst {
     const rootNodes: AstNode[] = [];
     const edges: AstEdge[] = [];
+    const layers: AstLayer[] = [{ id: CONNECTIONS_LAYER_ID, label: "Connections", visible: true, declarationOrder: -1 }];
+    let activeLayer: AstLayer | undefined;
     const stack: AstNode[] = [];
     const ids = new Set<string>();
     const parsedLayout: ParsedLayoutConfig = {};
@@ -140,6 +172,29 @@ export function parseDsl(source: string): DocumentAst {
         }
         const line = stripComment(rawLine).trim();
         if (!line) continue;
+        const layerMatch = line.match(LAYER_RE);
+        if (layerMatch) {
+            if (stack.length || activeLayer) throw new DslError(`Line ${lineNumber}: layers must be top-level and cannot be nested`, lineNumber);
+            const id = layerMatch[1]!;
+            if (id === CONNECTIONS_LAYER_ID) throw new DslError(`Line ${lineNumber}: layer ID ${id} is reserved for unassigned connections`, lineNumber);
+            if (layers.some((layer) => layer.id === id)) throw new DslError(`Line ${lineNumber}: duplicate layer ID ${id}`, lineNumber);
+            activeLayer = {
+                id,
+                label: layerMatch[2] === undefined ? id : unescapeQuoted(layerMatch[2]),
+                ...layerOptions(layerMatch[3], colors, lineNumber),
+                declarationOrder: layers.length,
+                line: lineNumber,
+            };
+            layers.push(activeLayer);
+            continue;
+        }
+        if (line === "}") {
+            if (activeLayer) { activeLayer = undefined; continue; }
+            if (!stack.length) throw new DslError(`Line ${lineNumber}: unexpected }`, lineNumber);
+            stack.pop();
+            continue;
+        }
+        if (activeLayer && !EDGE_RE.test(line) && !parseEdgeChain(line)) throw new DslError(`Line ${lineNumber}: only edges are allowed inside layer ${activeLayer.id}`, lineNumber);
         const colorMatch = line.match(COLOR_DECL_RE);
         if (colorMatch) {
             if (stack.length) throw new DslError(`Line ${lineNumber}: color constants must be top-level`, lineNumber);
@@ -148,11 +203,6 @@ export function parseDsl(source: string): DocumentAst {
             if (!color) throw new DslError(`Line ${lineNumber}: color must be a 3- or 6-digit hex value`, lineNumber);
             if (colors.has(name)) throw new DslError(`Line ${lineNumber}: color ${name} is already defined`, lineNumber);
             colors.set(name, color);
-            continue;
-        }
-        if (line === "}") {
-            if (!stack.length) throw new DslError(`Line ${lineNumber}: unexpected }`, lineNumber);
-            stack.pop();
             continue;
         }
         if (DEFAULT_LAYOUT_RE.test(line)) {
@@ -204,6 +254,7 @@ export function parseDsl(source: string): DocumentAst {
         const edgeMatch = line.match(EDGE_RE);
         if (edgeMatch) {
             const options = edgeOptions(edgeMatch[6], colors, lineNumber);
+            if (activeLayer && options.layerId !== undefined && options.layerId !== activeLayer.id) throw new DslError(`Line ${lineNumber}: edge layer ${options.layerId} conflicts with containing layer ${activeLayer.id}`, lineNumber);
             edges.push({
                 id: `edge:${edges.length + 1}:${edgeMatch[2]}:${edgeMatch[5]}`,
                 source: edgeMatch[2]!,
@@ -213,6 +264,7 @@ export function parseDsl(source: string): DocumentAst {
                 operator: edgeMatch[3] as EdgeOperator,
                 label: unquoteLabel(edgeMatch[7]),
                 ...options,
+                layerId: options.layerId ?? activeLayer?.id ?? CONNECTIONS_LAYER_ID,
                 declarationOrder: order++,
                 line: lineNumber,
             });
@@ -230,6 +282,7 @@ export function parseDsl(source: string): DocumentAst {
                     sourceSide: source.side,
                     targetSide: target.side,
                     operator: target.operator!,
+                    layerId: activeLayer?.id ?? CONNECTIONS_LAYER_ID,
                     declarationOrder: order++,
                     line: lineNumber,
                 });
@@ -299,6 +352,7 @@ export function parseDsl(source: string): DocumentAst {
         if (parent) parent.children.push(node); else rootNodes.push(node);
         if (opensBlock) stack.push(node);
     }
+    if (activeLayer) throw new DslError(`Line ${activeLayer.line}: unclosed layer: ${activeLayer.id}`, activeLayer.line);
     if (stack.length) {
         const unclosed = stack.at(-1)!;
         throw new DslError(`Line ${unclosed.line ?? "?"}: unclosed container: ${unclosed.id}`, unclosed.line);
@@ -311,6 +365,7 @@ export function parseDsl(source: string): DocumentAst {
         if (node.layout?.gridColumns !== undefined && !node.children.length) throw new DslError(`Line ${node.line ?? "?"}: col requires at least one child (container ${node.id})`, node.line);
         pendingNodes.push(...node.children);
     }
+    const layersById = new Map(layers.map((layer) => [layer.id, layer]));
     for (const edge of edges) {
         if (!ids.has(edge.source)) throw new DslError(`Line ${edge.line}: unknown edge source: ${edge.source}`, edge.line);
         if (!ids.has(edge.target)) throw new DslError(`Line ${edge.line}: unknown edge target: ${edge.target}`, edge.line);
@@ -320,6 +375,10 @@ export function parseDsl(source: string): DocumentAst {
         if (target?.definition.layoutOnly) throw new DslError(`Line ${edge.line}: Layout-only container cannot be an edge endpoint: ${edge.target}`, edge.line);
         if (source && !isRenderable(source)) throw new DslError(`Line ${edge.line}: Invisible node cannot be an edge endpoint: ${edge.source}`, edge.line);
         if (target && !isRenderable(target)) throw new DslError(`Line ${edge.line}: Invisible node cannot be an edge endpoint: ${edge.target}`, edge.line);
+        const layer = layersById.get(edge.layerId ?? CONNECTIONS_LAYER_ID);
+        if (!layer) throw new DslError(`Line ${edge.line}: unknown edge layer: ${edge.layerId}`, edge.line);
+        if (edge.color === undefined && layer.color !== undefined) edge.color = layer.color;
+        if (edge.width === undefined && layer.width !== undefined) edge.width = layer.width;
     }
-    return { layout: normalizeLayoutConfig(parsedLayout), nodes: rootNodes, edges };
+    return { layout: normalizeLayoutConfig(parsedLayout), nodes: rootNodes, edges, layers };
 }
