@@ -241,6 +241,20 @@ worker_a --> worker_d`);
     assert.match(xml, /exitPerimeter=1/);
 });
 
+test("core:layout IDs are optional", () => {
+    const ast = parseDsl(`core:layout {
+    aws:lambda first
+    core:layout {
+        aws:lambda second
+    }
+}`);
+    const [outer] = ast.nodes;
+    const inner = outer?.children[1];
+    assert.match(outer?.id ?? "", /^__core_layout_\d+$/);
+    assert.match(inner?.id ?? "", /^__core_layout_\d+$/);
+    assert.notEqual(outer?.id, inner?.id);
+});
+
 test("core groups accept reusable background colors and col directives", async () => {
     const ast = parseDsl(`color panel = #eef2f7
 core:group services "Services" [background=panel] {

@@ -330,7 +330,7 @@ export function parseDsl(source: string): DocumentAst {
 
         let id = explicitId ?? symbol.ref.name;
         const anonymousText = symbol.ref.namespace === "core" && symbol.ref.name === "text";
-        if (!explicitId && (symbol.definition.render === false || anonymousText)) {
+        if (!explicitId && (symbol.definition.render === false || symbol.definition.layoutOnly || anonymousText)) {
             do {
                 anonymousNodeCount += 1;
                 id = `__${symbol.ref.namespace}_${symbol.ref.name}_${anonymousNodeCount}`;

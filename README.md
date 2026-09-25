@@ -176,7 +176,7 @@ Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/s
 
 AWS containers include `aws:cloud`, `aws:region`, `aws:vpc`, `aws:subnet`, `aws:private_subnet`, `aws:public_subnet`, and `aws:az`. `core:group` provides a neutral alternative. Containers use braces and can be nested.
 
-Use `core:layout` for an invisible, structural container. It affects placement but does not create a draw.io cell, border, or label. This is useful when the visual architecture needs stable columns or grids without introducing another visible group.
+Use `core:layout` for an invisible, structural container. Its ID is optional; when omitted, a unique internal ID is generated. It affects placement but does not create a draw.io cell, border, or label. This is useful when the visual architecture needs stable columns or grids without introducing another visible group.
 
 Use `core:spacer` without an ID to reserve an empty, icon-sized grid slot. It is not rendered or available as an edge endpoint:
 
