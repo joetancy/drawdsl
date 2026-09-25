@@ -76,6 +76,26 @@ test("rapid edits resolve to the latest source", async ({ page }) => {
     await expect(page.locator("#copy-xml")).toBeEnabled();
 });
 
+test("editor autocompletes symbols and declared edge endpoints", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    const editor = page.locator("#source .cm-content");
+    await editor.fill("");
+    await editor.pressSequentially("aws:lam");
+    const completions = page.locator(".cm-tooltip-autocomplete");
+    await expect(completions).toContainText("aws:lambda");
+    await page.getByText("aws:lambda", { exact: true }).click();
+    await expect(editor).toContainText("aws:lambda");
+
+    await editor.fill("aws:lambda worker\naws:lambda client\nclient --> R:");
+    await editor.pressSequentially("wor");
+    await expect(completions).toContainText("worker");
+    await page.getByText("worker", { exact: true }).last().click();
+    await expect(editor).toContainText("client --> R:worker");
+});
+
 test("preview automatically recompiles after source edits", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);

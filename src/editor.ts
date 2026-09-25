@@ -1,12 +1,48 @@
 import { basicSetup } from "codemirror";
+import type { Completion, CompletionContext } from "@codemirror/autocomplete";
 import { foldService, HighlightStyle, StreamLanguage, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import type { Extension, Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { computeFoldRegions } from "./fold.js";
+import { registeredNamespaces, registeredSymbols } from "./symbols/registry.js";
 
-const directives = /^(direction|layout|layer|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
+const directiveWords = /^(direction|layout|layer|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
 const operators = /^(<-->|<-\.->|-->|-\.->|---|-\.-)$/;
+const symbols = registeredSymbols().map(({ label, detail }) => ({ label, detail, type: "type" }));
+const directiveCompletions: Completion[] = ["direction", "layout elk", "layer", "node-spacing", "layer-spacing", "edge-spacing", "padding", "col", "grid-columns", "color"].map((label) => ({ label, detail: "directive", type: "keyword" }));
+const endpointOperator = /(?:<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:[TRBLtrbl]:)?$/;
+const endpointIds = (source: string): Completion[] => {
+    const namespaces = registeredNamespaces().join("|");
+    const declarations = new RegExp(`^\\s*(?:${namespaces}):[\\w-]+\\s+([A-Za-z_][\\w-]*)`, "gm");
+    return [...source.matchAll(declarations)].map((match) => match[1]!).filter((id, index, ids) => ids.indexOf(id) === index).map((label) => ({ label, type: "variable" }));
+};
+
+function dslCompletions(context: CompletionContext) {
+    const line = context.state.doc.lineAt(context.pos);
+    const before = line.text.slice(0, context.pos - line.from);
+    if (before.includes("#") || (before.match(/"/g)?.length ?? 0) % 2 === 1) return null;
+    const word = context.matchBefore(/[A-Za-z_][\w:-]*/);
+    if (!word && !context.explicit) return null;
+    let from = word?.from ?? context.pos;
+    let token = word?.text ?? "";
+    const lineBeforeWord = line.text.slice(0, from - line.from);
+    let options: Completion[];
+    if (endpointOperator.test(lineBeforeWord)) {
+        const side = token.match(/^[TRBLtrbl]:(.*)$/);
+        if (side) { from += 2; token = side[1]!; }
+        options = endpointIds(context.state.doc.toString());
+    } else if (!lineBeforeWord.trim()) {
+        options = [...directiveCompletions, ...symbols];
+    } else if (/^(?:direction|layout)\s+$/.test(lineBeforeWord.trimStart())) {
+        options = (lineBeforeWord.trimStart().startsWith("direction") ? ["right", "left", "down", "up"] : ["elk"]).map((label) => ({ label, type: "keyword" }));
+    } else {
+        return null;
+    }
+    const filtered = options.filter((option) => option.label.toLowerCase().startsWith(token.toLowerCase()));
+    if (!filtered.length) return null;
+    return { from, options: filtered, validFor: /[\w:-]*/ };
+}
 const highlightStyles = [
     HighlightStyle.define([
         { tag: tags.keyword, color: "#6D28D9" }, { tag: tags.typeName, color: "#1D4ED8" },
@@ -41,13 +77,13 @@ const dsl = StreamLanguage.define({
         const match = stream.match(/^(?:<-->|<-\.->|-->|-\.->|---|-\.-|[TRBLtrbl]:|[A-Za-z_][\w-]*:[A-Za-z_][\w-]*|[A-Za-z_][\w-]*|\d+|[{}]|.)/);
         const value = typeof match === "boolean" ? "" : match?.[0] ?? "";
         if (operators.test(value) || /^[{}]$/.test(value)) { state.first = false; return "operator"; }
-        if (state.first && directives.test(value)) { state.first = false; return "keyword"; }
+        if (state.first && directiveWords.test(value)) { state.first = false; return "keyword"; }
         state.first = false;
         if (/^(?:[TRBLtrbl]:)?[A-Za-z_][\w-]*:[A-Za-z_][\w-]*$/.test(value)) return "typeName";
         if (/^\d+$/.test(value)) return "number";
         return null;
     },
-    languageData: { commentTokens: { line: "#" } },
+    languageData: { commentTokens: { line: "#" }, autocomplete: dslCompletions },
 });
 
 const foldDsl = foldService.of((state, lineStart, lineEnd) => {

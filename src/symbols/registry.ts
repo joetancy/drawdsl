@@ -11,6 +11,13 @@ export function registeredNamespaces(): string[] {
     return [...providers.keys()].sort();
 }
 
+export function registeredSymbols(): Array<{ label: string; detail: string }> {
+    return [...providers.values()].flatMap((provider) => [
+        ...Object.entries(provider.symbols).map(([name, definition]) => ({ label: `${provider.namespace}:${name}`, detail: definition.role })),
+        ...Object.entries(provider.aliases ?? {}).map(([alias, name]) => ({ label: `${provider.namespace}:${alias}`, detail: `alias for ${provider.namespace}:${name}` })),
+    ]).sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export function qualifiedCandidates(name: string): string[] {
     const candidates: string[] = [];
     for (const provider of providers.values()) {
