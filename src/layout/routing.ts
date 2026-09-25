@@ -368,6 +368,34 @@ function conflictScore(paths: RoutePath[], edgeSpacing: number): number {
     return score;
 }
 
+function laneOffset(segment: Segment, other: Segment, spacing: number): number {
+    const lane = (item: Segment): number => item.horizontal ? item.start.y : item.start.x;
+    const current = lane(segment);
+    const otherLane = lane(other);
+    const side = Math.sign(current - otherLane) || (segment.path.edge.declarationOrder > other.path.edge.declarationOrder ? 1 : -1);
+    return otherLane + side * spacing - current;
+}
+
+function excessSpacingScore(paths: RoutePath[], edgeSpacing: number): number {
+    const segments = routeSegments(paths);
+    let score = 0;
+    for (let first = 0; first < segments.length; first += 1) {
+        for (let second = first + 1; second < segments.length; second += 1) {
+            const a = segments[first]!;
+            const b = segments[second]!;
+            if (a.path === b.path || a.horizontal !== b.horizontal) continue;
+            const aStart = a.horizontal ? a.start.x : a.start.y;
+            const aEnd = a.horizontal ? a.end.x : a.end.y;
+            const bStart = b.horizontal ? b.start.x : b.start.y;
+            const bEnd = b.horizontal ? b.end.x : b.end.y;
+            const overlap = overlapLength(aStart, aEnd, bStart, bEnd);
+            const distance = Math.abs((a.horizontal ? a.start.y : a.start.x) - (b.horizontal ? b.start.y : b.start.x));
+            if (overlap > 0 && distance > edgeSpacing) score += overlap * (distance - edgeSpacing);
+        }
+    }
+    return score;
+}
+
 /** Separates close or shared route segments from every routing group when a clear lane exists. */
 export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge[], routes: Map<string, Route>, config: LayoutConfig): void {
     const paths = edges.flatMap((edge): RoutePath[] => {
@@ -418,6 +446,42 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                     }
                     if (adjusted) break;
                 }
+            }
+        }
+        if (!adjusted) break;
+    }
+    // ponytail: equalize movable interior runs only; a full bundled-path solver would be needed to normalize endpoint and junction gaps.
+    for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
+        const baseline = excessSpacingScore(paths, config.edgeSpacing);
+        if (!baseline) break;
+        let adjusted = false;
+        const segments = routeSegments(paths);
+        for (let first = 0; first < segments.length && !adjusted; first += 1) {
+            for (let second = first + 1; second < segments.length && !adjusted; second += 1) {
+                const a = segments[first]!;
+                const b = segments[second]!;
+                if (a.path === b.path || a.horizontal !== b.horizontal) continue;
+                const aStart = a.horizontal ? a.start.x : a.start.y;
+                const aEnd = a.horizontal ? a.end.x : a.end.y;
+                const bStart = b.horizontal ? b.start.x : b.start.y;
+                const bEnd = b.horizontal ? b.end.x : b.end.y;
+                const distance = Math.abs((a.horizontal ? a.start.y : a.start.x) - (b.horizontal ? b.start.y : b.start.x));
+                if (overlapLength(aStart, aEnd, bStart, bEnd) <= 0 || distance <= config.edgeSpacing) continue;
+                for (const [segment, other] of [[b, a], [a, b]] as const) {
+                    if (segment.index === 0 || segment.index === segment.path.points.length - 2) continue;
+                    const offset = laneOffset(segment, other, config.edgeSpacing);
+                    const candidate = nudgePath(segment, offset, config.edgeEndpointClearance);
+                    if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
+                    if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
+                    const original = segment.path.points;
+                    segment.path.points = candidate;
+                    if (conflictScore(paths, config.edgeSpacing) === 0 && excessSpacingScore(paths, config.edgeSpacing) < baseline) {
+                        adjusted = true;
+                        break;
+                    }
+                    segment.path.points = original;
+                }
+                if (adjusted) break;
             }
         }
         if (!adjusted) break;

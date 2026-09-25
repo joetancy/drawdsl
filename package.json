@@ -21,8 +21,7 @@
     "check": "tsc --noEmit",
     "web:dev": "vite",
     "web:build": "vite build",
-    "web:preview": "vite preview",
-    "plugin:build": "vite build --config vite.plugin.config.ts"
+    "web:preview": "vite preview"
   },
   "dependencies": {
     "@codemirror/language": "^6.12.4",

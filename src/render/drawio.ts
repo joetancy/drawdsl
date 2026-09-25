@@ -1,7 +1,7 @@
 import { CONNECTIONS_LAYER_ID, isRenderable, type AstLayer, type FlatLayoutNode, type NodeSide, type Point, type RoutedEdge } from "../model.js";
 
 function xmlEscape(value: string): string {
-    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\n", "&#xa;");
+    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;").replaceAll("\r", "&#xd;").replaceAll("\n", "&#xa;").replaceAll("\t", "&#x9;");
 }
 
 // Labels render with html=1, so escape HTML first so XML-decoded text displays literally.
@@ -52,7 +52,7 @@ function edgeStyle(edge: RoutedEdge, nodes: Map<string, FlatLayoutNode>): string
     return styleString(["edgeStyle=orthogonalEdgeStyle", "rounded=0", "orthogonalLoop=1", "jettySize=auto", "html=1", `strokeWidth=${edge.width ?? 1}`, ...(edge.color ? [`strokeColor=${edge.color}`] : []), `endArrow=${directed ? "block" : "none"}`, `endFill=${directed ? "1" : "0"}`, `startArrow=${bidirectional ? "block" : "none"}`, `startFill=${bidirectional ? "1" : "0"}`, `dashed=${dashed ? "1" : "0"}`, ...attachment("exit", edge.sourcePoint, nodes.get(edge.source), edge.sourceSide), ...attachment("entry", edge.targetPoint, nodes.get(edge.target), edge.targetSide)]);
 }
 
-export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = []): string {
+export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = [], source?: string): string {
     const connectionLayers = [...layers];
     if (!connectionLayers.some((layer) => layer.id === CONNECTIONS_LAYER_ID)) {
         connectionLayers.unshift({ id: CONNECTIONS_LAYER_ID, label: "Connections", visible: true, declarationOrder: -1 });
@@ -65,7 +65,10 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[],
     }
     const lines = [
         '<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
-        "  <root>", '    <mxCell id="0"/>', '    <mxCell id="1" value="Architecture" parent="0"/>',
+        "  <root>", '    <mxCell id="0"/>',
+        source === undefined
+            ? '    <mxCell id="1" value="Architecture" parent="0"/>'
+            : `    <object label="Architecture" drawdslSource="${xmlEscape(source)}"><mxCell id="1" parent="0"/></object>`,
     ];
     for (const layer of connectionLayers) {
         lines.push(`    <mxCell id="${xmlEscape(`layer:${layer.id}`)}" value="${xmlEscape(layer.label)}" parent="0" visible="${layer.visible ? "1" : "0"}"/>`);
@@ -98,7 +101,7 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[],
     return `${lines.join("\n")}\n`;
 }
 
-export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = []): string {
-    const model = renderMxGraphModel(nodes, edges, layers);
+export function renderDrawio(nodes: FlatLayoutNode[], edges: RoutedEdge[], layers: readonly AstLayer[] = [], source?: string): string {
+    const model = renderMxGraphModel(nodes, edges, layers, source);
     return `<?xml version="1.0" encoding="UTF-8"?>\n<mxfile host="app.diagrams.net" agent="drawdsl" version="26.0.0" type="device">\n  <diagram id="drawdsl" name="Architecture">\n${model.split("\n").map((line) => `    ${line}`).join("\n")}\n  </diagram>\n</mxfile>\n`;
 }

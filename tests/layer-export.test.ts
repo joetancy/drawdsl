@@ -31,7 +31,7 @@ function cell(xml: string, id: string): string {
 
 test("compiler exports named root layers and cross-layer endpoints", async () => {
     const xml = await compileDrawDsl(source);
-    assert.match(cell(xml, "1"), /value="Architecture" parent="0"/);
+    assert.match(cell(xml, "1"), /<object label="Architecture" drawdslSource=".*"><mxCell id="1" parent="0"\/>/);
     assert.match(cell(xml, "layer:connections"), /value="Connections" parent="0" visible="1"/);
     assert.match(cell(xml, "layer:requests"), /value="Request flow" parent="0" visible="1"/);
     assert.match(cell(xml, "layer:events"), /value="Event flow" parent="0" visible="0"/);

@@ -11,7 +11,7 @@ npm install
 npm run generate -- examples/example.drawdsl output.drawio
 ```
 
-Open `output.drawio` in [diagrams.net](https://www.diagrams.net/) or draw.io Desktop. Generated nodes, groups, labels, and connectors remain editable.
+Open `output.drawio` in [diagrams.net](https://www.diagrams.net/) or draw.io Desktop. Generated nodes, groups, labels, and connectors remain editable. The original DSL is embedded as a `drawdslSource` custom property on the Architecture layer; it is a snapshot and does not track later edits made in draw.io.
 
 Generate the bundled example:
 
@@ -140,7 +140,7 @@ The ID `connections` is reserved for the implicit default layer. Layer IDs and n
 
 Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without recompiling, rerunning ELK, or rerouting edges. Nodes, waypoints, labels, zoom, and pan remain stable. Preview choices survive edits and theme changes, but do not change the source or canonical export. Use `visible=false` in the DSL when a flow should be saved or shared as initially hidden.
 
-Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. Open the file directly in draw.io and use its Layers panel.
+Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. The original DSL is stored on the Architecture layer as the `drawdslSource` custom property, so the source travels with the diagram as a snapshot. Open the file directly in draw.io and use its Layers panel.
 
 See the [complete layer reference](docs/layers.md) and the [capability example](examples/flows.drawdsl).
 
@@ -249,7 +249,7 @@ Container directions support `right`, `left`, `down`, and `up`. A local `directi
 
 ELK positions the hierarchy and the orthogonal router uses the completed geometry. Visible containers unrelated to either endpoint remain routing obstacles, while source and destination ancestor containers stay traversable so connections can enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points.
 
-`edge-spacing` is the preferred gap between overlapping parallel route segments. Edges are routed with their own container obstacles, then a final obstacle-aware lane pass applies spacing across routes from different container-routing passes without adding bends to a straight route. Unrelated visible container borders receive the internal 40px routing clearance; source and destination ancestors remain traversable. Perpendicular crossings are allowed and do not affect routing.
+`edge-spacing` sets the target pitch for clear, overlapping parallel route segments. The obstacle-aware cleanup equalizes movable interior runs and separates closer lanes; fixed endpoint stubs, junctions, and obstacles can prevent uniform spacing near nodes or turns. A straight route is not bent solely to create a parallel lane. Unrelated visible container borders receive the internal 40px routing clearance; source and destination ancestors remain traversable. Perpendicular crossings are allowed and do not affect routing.
 
 Explicit `T:`, `R:`, `B:`, and `L:` endpoint selectors remain available when a relationship needs a specific source or target side.
 
@@ -317,7 +317,7 @@ The repository deploys the playground to `https://joetancy.github.io/drawdsl/` o
 
 Use **Copy share link** to copy a self-contained link to the current DSL. The playground stores the diagram in the URL fragment, compressing it when that produces a shorter link; no diagram data is sent to or stored by a backend. The URL updates three seconds after you stop typing, while the copy button always creates the current link immediately. Anyone with the link can read its contents, so do not include secrets. Compressed links use `#v=1&z=...` and take precedence over legacy `#dsl=...` links; unsupported versions are rejected. Share imports are limited to 1 MiB encoded and 2 MiB decoded DSL.
 
-The editor highlights DSL syntax and reports errors inline, with a Go-to-line button for diagnostics. Containers and connection layer blocks collapse via the fold gutter chevrons (or **Fold all**); folded lines stay part of the diagram. Use **Format DrawDSL** to normalize indentation, **Show draw.io XML** to inspect the generated output (with **Copy draw.io XML** to copy it), and **Dark mode** to toggle the preview theme. **Download .drawdsl** saves the exact current source (even invalid drafts) and **Download .drawio** saves the current successful output; failed compiles cannot download stale XML. Filenames reuse the loaded diagram name with a safe fallback. **DSL guide** and **SKILL.md** open the authoring help; the skill text is loaded from `SKILL.md` and can be copied for LLM-assisted diagramming.
+The editor highlights DSL syntax and reports errors inline, with a Go-to-line button for diagnostics. Containers and connection layer blocks collapse via the fold gutter chevrons (or **Fold all**); folded lines stay part of the diagram. Use **Format DrawDSL** to normalize indentation, **Show draw.io XML** to inspect the generated output (with **Copy draw.io XML** to copy it), and **Dark mode** to toggle the preview theme. **Download .drawdsl** saves the exact current source (even invalid drafts) and **Download .drawio** saves the current successful output with the source embedded as `drawdslSource`; failed compiles cannot download stale XML. The embedded DSL is a snapshot and won’t reflect later edits in draw.io. Filenames reuse the loaded diagram name with a safe fallback. **DSL guide** and **SKILL.md** open the authoring help; the skill text is loaded from `SKILL.md` and can be copied for LLM-assisted diagramming.
 
 Use **Saved** to keep named diagrams in this browser's local storage (via **Save copy**, with **Save** updating the loaded diagram). Saved diagrams stay on the device until deleted and are never sent anywhere.
 

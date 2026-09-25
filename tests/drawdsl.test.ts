@@ -19,9 +19,11 @@ test("requires namespaces and resolves aliases", () => {
 });
 
 test("compiler boundary produces native draw.io XML", async () => {
-    const xml = await compileDrawDsl("aws:lambda source\naws:sqs target\nsource --> target");
+    const source = 'aws:lambda source "A & B"\naws:sqs target\nsource --> target';
+    const xml = await compileDrawDsl(source);
     assert.match(xml, /<mxfile/);
     assert.match(xml, /source="source" target="target"/);
+    assert.ok(xml.includes('drawdslSource="aws:lambda source &quot;A &amp; B&quot;&#xa;aws:sqs target&#xa;source --&gt; target"'));
 });
 
 test("mxGraph model renderer is usable without a draw.io file wrapper", async () => {
@@ -402,6 +404,23 @@ test("global edge spacing separates genuinely overlapping route segments", () =>
     enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
 
     assert.notEqual(routes.get("first")!.bendPoints[0]!.y, routes.get("second")!.bendPoints[0]!.y);
+});
+
+test("global edge spacing normalizes clear parallel runs to the configured pitch", () => {
+    const edges = [
+        { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
+        { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
+    ];
+    const routes = new Map([
+        ["first", { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 50 }, { x: 200, y: 50 }], targetPoint: { x: 200, y: 100 } }],
+        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 90 }, { x: 180, y: 90 }], targetPoint: { x: 180, y: 100 } }],
+    ]);
+
+    enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
+
+    const firstLane = routes.get("first")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
+    const secondLane = routes.get("second")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
+    assert.equal(Math.abs(firstLane - secondLane), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
 });
 
 test("global edge spacing preserves a clear straight route", () => {

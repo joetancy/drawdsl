@@ -70,7 +70,7 @@ R:api --> T:service
 
 ## Connection layers
 
-Nodes and containers stay on Architecture. Every edge belongs to exactly one connection layer. Unassigned edges use the implicit Connections layer. A plugin is not required.
+Nodes and containers stay on Architecture. Every edge belongs to exactly one connection layer. Unassigned edges use the implicit Connections layer.
 
 ```text
 color requestColor = #2563EB
@@ -113,7 +113,11 @@ An edge inside a layer block may explicitly name the same layer, but assigning a
 
 Layer switches do not change layout or routing. Preview switches are view state only: they are not written back to the DSL, share link, or export. Use `visible=false` in source when a flow should be saved or shared as initially hidden. The `layer-spacing` layout directive is unrelated to connection visibility layers.
 
-Exported `.drawio` files use native draw.io layers. Nodes remain on Architecture; Connections and every named flow are root-level layers whose edges point to the shared nodes.
+Exported `.drawio` files use native draw.io layers. Nodes remain on Architecture; Connections and every named flow are root-level layers whose edges point to the shared nodes. The original DSL is embedded in the Architecture layer's `drawdslSource` custom property as a snapshot; edits made later in draw.io do not update it.
+
+## Output
+
+The compiler generates native, editable `.drawio` XML and embeds the exact input DSL in the Architecture layer's `drawdslSource` property. No draw.io plugin is needed.
 
 ## Built-in symbols
 
