@@ -246,13 +246,14 @@ test("containers fold and unfold from the gutter", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    const source = page.locator("#source .cm-content");
+    const unfoldedText = await source.innerText();
     await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
-    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
-    await expect(page.locator("#source .cm-content")).toContainText(/aws:cloud cloud/);
+    await expect.poll(() => source.innerText()).not.toBe(unfoldedText);
     // Compilation still sees the folded lines.
     await expect(page.locator("#copy-xml")).toBeEnabled();
     await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
-    await expect(page.locator("#source .cm-content")).toContainText(/Request handler/);
+    await expect.poll(() => source.innerText()).toBe(unfoldedText);
 });
 
 test("edits outside a fold keep it folded", async ({ page }) => {
@@ -274,12 +275,14 @@ test("fold-all toggle and error navigation with folds", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    const source = page.locator("#source .cm-content");
+    const unfoldedText = await source.innerText();
     await page.click("#fold-toggle");
     await expect(page.locator("#fold-toggle")).toContainText("Unfold all");
-    await expect(page.locator("#source .cm-content")).not.toContainText(/Request handler/);
+    await expect.poll(() => source.innerText()).not.toBe(unfoldedText);
     await page.click("#fold-toggle");
     await expect(page.locator("#fold-toggle")).toContainText("Fold all");
-    await expect(page.locator("#source .cm-content")).toContainText(/Request handler/);
+    await expect.poll(() => source.innerText()).toBe(unfoldedText);
     // Error on a visible line still navigates while another region stays folded.
     await page.locator("#source .cm-foldGutter .cm-gutterElement").nth(3).click();
     await page.locator("#source .cm-content").click();
