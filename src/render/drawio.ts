@@ -68,7 +68,7 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[],
         "  <root>", '    <mxCell id="0"/>',
         source === undefined
             ? '    <mxCell id="1" value="Architecture" parent="0"/>'
-            : `    <object label="Architecture" drawdslSource="${xmlEscape(source)}"><mxCell id="1" parent="0"/></object>`,
+            : `    <object id="1" label="Architecture" drawdslSource="${xmlEscape(source)}"><mxCell parent="0"/></object>`,
     ];
     for (const layer of connectionLayers) {
         lines.push(`    <mxCell id="${xmlEscape(`layer:${layer.id}`)}" value="${xmlEscape(layer.label)}" parent="0" visible="${layer.visible ? "1" : "0"}"/>`);
