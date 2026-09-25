@@ -404,7 +404,8 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                         for (const candidate of [endpoint, nudgePath(segment, offset, config.edgeEndpointClearance)]) {
                             if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
                             if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
-                            if (candidate !== endpoint && candidate.length > simplifyWaypoints(segment.path.points).length) continue;
+                            if (candidate !== endpoint && candidate.length > simplifyWaypoints(segment.path.points).length
+                                && sharedLength(segment.path.points, paths, segment.path) === 0) continue;
                             const original = segment.path.points;
                             segment.path.points = candidate;
                             if (conflictScore(paths, config.edgeSpacing) < baseline) {

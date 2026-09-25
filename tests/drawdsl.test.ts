@@ -375,6 +375,21 @@ test("global edge spacing does not add bends solely to separate routes", () => {
     assert.equal(routes.get("second")!.bendPoints.length, 2);
 });
 
+test("global edge spacing separates genuinely overlapping route segments", () => {
+    const edges = [
+        { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
+        { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
+    ];
+    const routes = new Map([
+        ["first", { sourcePoint: { x: 0, y: 0 }, bendPoints: [{ x: 0, y: 50 }, { x: 200, y: 50 }], targetPoint: { x: 200, y: 100 } }],
+        ["second", { sourcePoint: { x: 20, y: 0 }, bendPoints: [{ x: 20, y: 50 }, { x: 180, y: 50 }], targetPoint: { x: 180, y: 100 } }],
+    ]);
+
+    enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
+
+    assert.notEqual(routes.get("first")!.bendPoints[0]!.y, routes.get("second")!.bendPoints[0]!.y);
+});
+
 test("global edge spacing preserves a clear straight route", () => {
     const edges = [
         { id: "bent", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },

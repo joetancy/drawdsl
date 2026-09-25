@@ -112,6 +112,7 @@ export class LayerPreview {
         const button = (label: string, action: () => void): HTMLButtonElement => {
             const control = document.createElement("button");
             control.type = "button";
+            control.className = "toolbar-button";
             control.textContent = label;
             control.addEventListener("click", () => { action(); this.applyVisibility(); });
             return control;
