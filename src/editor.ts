@@ -5,7 +5,7 @@ import { tags } from "@lezer/highlight";
 import type { Extension, Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { computeFoldRegions } from "./fold.js";
-import { registeredNamespaces, registeredSymbols } from "./symbols/registry.js";
+import { registeredNamespaces, registeredSymbols, resolveSymbol } from "./symbols/registry.js";
 
 const directiveWords = /^(direction|layout|layer|node-spacing|layer-spacing|edge-spacing|padding|col|grid-columns|color)$/;
 const operators = /^(<-->|<-\.->|-->|-\.->|---|-\.-)$/;
@@ -14,8 +14,15 @@ const directiveCompletions: Completion[] = ["direction", "layout elk", "layer", 
 const endpointOperator = /(?:<-->|<-\.->|-->|-\.->|---|-\.-)\s*(?:[TRBLtrbl]:)?$/;
 const endpointIds = (source: string): Completion[] => {
     const namespaces = registeredNamespaces().join("|");
-    const declarations = new RegExp(`^\\s*(?:${namespaces}):[\\w-]+\\s+([A-Za-z_][\\w-]*)`, "gm");
-    return [...source.matchAll(declarations)].map((match) => match[1]!).filter((id, index, ids) => ids.indexOf(id) === index).map((label) => ({ label, type: "variable" }));
+    const declarations = new RegExp(`^\\s*(${namespaces}):([\\w-]+)\\s+([A-Za-z_][\\w-]*)`, "gm");
+    const ids = new Set<string>();
+    for (const [, namespace, symbol, id] of source.matchAll(declarations)) {
+        try {
+            const definition = resolveSymbol({ namespace: namespace!, name: symbol! }).definition;
+            if (definition.render !== false && !definition.layoutOnly) ids.add(id!);
+        } catch { /* Ignore incomplete declarations while editing. */ }
+    }
+    return [...ids].map((label) => ({ label, detail: "declared resource", type: "variable" }));
 };
 
 function dslCompletions(context: CompletionContext) {
@@ -33,7 +40,7 @@ function dslCompletions(context: CompletionContext) {
         if (side) { from += 2; token = side[1]!; }
         options = endpointIds(context.state.doc.toString());
     } else if (!lineBeforeWord.trim()) {
-        options = [...directiveCompletions, ...symbols];
+        options = [...directiveCompletions, ...symbols, ...endpointIds(context.state.doc.toString())];
     } else if (/^(?:direction|layout)\s+$/.test(lineBeforeWord.trimStart())) {
         options = (lineBeforeWord.trimStart().startsWith("direction") ? ["right", "left", "down", "up"] : ["elk"]).map((label) => ({ label, type: "keyword" }));
     } else {

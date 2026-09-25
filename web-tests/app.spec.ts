@@ -94,6 +94,11 @@ test("editor autocompletes symbols and declared edge endpoints", async ({ page }
     await expect(completions).toContainText("worker");
     await page.getByText("worker", { exact: true }).last().click();
     await expect(editor).toContainText("client --> R:worker");
+
+    await editor.fill("aws:lambda my_service\nmy");
+    await expect(completions).toContainText("my_service");
+    await page.getByText("my_service", { exact: true }).last().click();
+    await expect(editor).toContainText("my_service");
 });
 
 test("preview automatically recompiles after source edits", async ({ page }) => {
