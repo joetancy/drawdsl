@@ -84,7 +84,7 @@ export function renderMxGraphModel(nodes: FlatLayoutNode[], edges: RoutedEdge[],
     for (const node of ordered) {
         const parentNode = parentFor(node); const parent = parentNode?.id ?? (node.layerId ? `layer:${node.layerId}` : "1");
         const x = parentNode ? node.x - parentNode.x : node.x; const y = parentNode ? node.y - parentNode.y : node.y;
-        const value = node.symbol.namespace === "core" && node.symbol.name === "image" ? "" : node.label;
+        const value = node.symbol.namespace === "core" && node.symbol.name === "image" ? node.displayLabel ?? "" : node.label;
         lines.push(`    <mxCell id="${xmlEscape(node.id)}" value="${labelForXml(value)}" style="${xmlEscape(nodeStyle(node))}" vertex="1" parent="${xmlEscape(parent)}">`);
         lines.push(`      <mxGeometry x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${node.width.toFixed(2)}" height="${node.height.toFixed(2)}" as="geometry"/>`, "    </mxCell>");
     }

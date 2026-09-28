@@ -164,10 +164,11 @@ npm run generate -- examples/flows.drawdsl flows.drawio
 
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
 
-Use `core:image` with a quoted absolute HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; its displayed label is intentionally empty. URLs containing `;` are rejected because `;` delimits draw.io styles.
+Use `core:image` with a quoted absolute HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; add a second quoted string for its optional displayed label. URLs containing `;` are rejected because `;` delimits draw.io styles.
 
 ```text
 core:image architecture_reference "https://example.com/architecture.png"
+core:image architecture_icon "https://example.com/icon.png" "Architecture icon"
 ```
 
 Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/symbols/core.ts](src/symbols/core.ts). To add another icon family, implement a `SymbolProvider` and register it in [src/symbols/registry.ts](src/symbols/registry.ts). Parsing, layout, and rendering consume the shared symbol model, so provider-specific details stay isolated.
@@ -211,7 +212,7 @@ worker --> records
 
 `col N` sets a container’s direct-child grid column count. Child subtrees are first sized, then placed into an exact declaration-ordered grid. When omitted, containers automatically use `ceil(sqrt(child count))` columns (six children use three columns; nine use three). Each column uses the width of its widest child, each row uses the height of its tallest child, and smaller children are centered within their cells. ELK uses those finished bounds when laying out the surrounding visible container. Resources inside a grid can still have edges. `core:layout` cannot be used as an edge endpoint.
 
-Layout settings use the same flat, hyphenated syntax as the existing directives. Document-level values apply throughout the diagram; a setting inside a container overrides that container's direct-child layout:
+Layout settings use the same flat, hyphenated syntax as the existing directives. Document-level values apply throughout the diagram; a setting inside a container applies to its descendants, until overridden inside a nested container:
 
 ```text
 direction right

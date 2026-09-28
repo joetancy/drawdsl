@@ -11,7 +11,7 @@ const GRID_COLUMNS_RE = /^(col|grid-columns)\s+(\S+)$/;
 const LAYOUT_SETTING_RE = /^(node-spacing|layer-spacing|edge-spacing|padding)(?:\s+(.*))?$/;
 const COLOR_DECL_RE = /^color\s+([A-Za-z_][\w-]*)\s*=\s*(#\S+)$/;
 const LAYER_RE = /^layer\s+([A-Za-z_][\w-]*)(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*\{$/;
-const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*(\{)?$/;
+const DECLARATION_RE = /^([A-Za-z_][\w-]*):([A-Za-z_][\w-]*)(?:\s+([A-Za-z_][\w-]*))?(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+"((?:[^"\\]|\\.)*)")?(?:\s+\[([^\]]*)\])?\s*(\{)?$/;
 const UNQUALIFIED_RE = /^([A-Za-z_][\w-]*)\b/;
 
 function scanLine(line: string): { commentIndex: number; unclosedQuote: boolean } {
@@ -37,7 +37,7 @@ export function hasUnclosedQuote(line: string): boolean {
 }
 
 export function isBlockOpener(code: string): boolean {
-    return Boolean(code.match(DECLARATION_RE)?.[6]) || LAYER_RE.test(code);
+    return Boolean(code.match(DECLARATION_RE)?.[7]) || LAYER_RE.test(code);
 }
 
 function unescapeQuoted(value: string): string {
@@ -304,12 +304,13 @@ export function parseDsl(source: string): DocumentAst {
         const symbol = parseSymbol(`${declarationMatch[1]}:${declarationMatch[2]}`, lineNumber);
         const explicitId = declarationMatch[3];
         const quotedLabel = declarationMatch[4];
-        const opensBlock = Boolean(declarationMatch[6]);
+        const opensBlock = Boolean(declarationMatch[7]);
+        const displayLabel = declarationMatch[5] === undefined ? undefined : unescapeQuoted(declarationMatch[5]);
         let backgroundColor: string | undefined;
         let borderStyle: "solid" | "dashed" | "dotted" | undefined;
         let rounded: boolean | undefined;
-        const rawGroupOptions = declarationMatch[5];
-        if (rawGroupOptions !== undefined) {
+        const rawGroupOptions = declarationMatch[6];
+        if (rawGroupOptions !== undefined && !(symbol.ref.namespace === "core" && symbol.ref.name === "image")) {
             if (symbol.ref.namespace !== "core" || symbol.ref.name !== "group") throw new DslError(`Line ${lineNumber}: group options are only supported on core:group`, lineNumber);
             const seen = new Set<string>();
             for (const rawOption of rawGroupOptions.split(",")) {
@@ -332,6 +333,7 @@ export function parseDsl(source: string): DocumentAst {
         }
         const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (symbol.ref.namespace === "core" && symbol.ref.name === "image") {
+            if (rawGroupOptions !== undefined) throw new DslError(`Line ${lineNumber}: core:image labels use a second quoted string`, lineNumber);
             if (quotedLabel === undefined) throw new DslError(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`, lineNumber);
             let url: URL;
             try {
@@ -341,6 +343,8 @@ export function parseDsl(source: string): DocumentAst {
             }
             if (url.protocol !== "http:" && url.protocol !== "https:") throw new DslError(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`, lineNumber);
             if (label.includes(";")) throw new DslError(`Line ${lineNumber}: core:image URL must not contain ";"`, lineNumber);
+        } else if (displayLabel !== undefined) {
+            throw new DslError(`Line ${lineNumber}: a second quoted label is only supported on core:image`, lineNumber);
         }
         const container = symbol.definition.role === "container";
         if (opensBlock && !container) throw new DslError(`Line ${lineNumber}: resource property blocks are not implemented`, lineNumber);
@@ -362,6 +366,7 @@ export function parseDsl(source: string): DocumentAst {
             symbol: symbol.ref,
             definition: symbol.definition,
             label,
+            ...(displayLabel !== undefined ? { displayLabel } : {}),
             ...(backgroundColor ? { backgroundColor } : {}),
             ...(borderStyle ? { borderStyle } : {}),
             ...(rounded !== undefined ? { rounded } : {}),

@@ -165,6 +165,17 @@ test("core images render as image cells without a visible label", () => {
     assert.match(xml, /value=""/);
 });
 
+test("core images accept an optional visible label as a second quoted string", () => {
+    const ast = parseDsl('core:image reference "https://example.com/reference.png" "Architecture reference"');
+    const image = ast.nodes[0]!;
+    assert.equal(image.label, "https://example.com/reference.png");
+    assert.equal(image.displayLabel, "Architecture reference");
+    const xml = renderDrawio([{ id: image.id, symbol: image.symbol, definition: image.definition, label: image.label, displayLabel: image.displayLabel, x: 0, y: 0, width: 160, height: 80, declarationOrder: 0 }], []);
+    assert.match(xml, /value="Architecture reference"/);
+    assert.equal(parseDsl('core:image reference "https://example.com/reference.png" "Reference\\nimage"').nodes[0]?.displayLabel, "Reference\nimage");
+    assert.throws(() => parseDsl('core:image reference "https://example.com/reference.png" [label="Architecture reference"]'), /labels use a second quoted string/);
+});
+
 test("anonymous spacers reserve layout space without rendering", async () => {
     const ast = parseDsl(`core:layout row {
     grid-columns 3
@@ -679,6 +690,33 @@ core:layout local {
     const node = (id: string) => layout.nodes.find((item) => item.id === id)!;
     assert.equal(node("second").x - node("first").x - node("first").width, 50);
     assert.equal(node("fourth").x - node("third").x - node("third").width, 15);
+});
+
+test("container node-spacing propagates into nested groups and layout containers", async () => {
+    const layout = await layoutDocument(parseDsl(`core:group outer {
+    node-spacing 27
+    core:group middle {
+        core:layout inner {
+            col 2
+            core:text first "First"
+            core:text second "Second"
+        }
+    }
+}`));
+    const node = (id: string) => layout.nodes.find((item) => item.id === id)!;
+    assert.equal(node("second").x - node("first").x - node("first").width, 27);
+
+    const overridden = await layoutDocument(parseDsl(`core:group outer {
+    node-spacing 27
+    core:layout inner {
+        col 2
+        node-spacing 9
+        core:text first "First"
+        core:text second "Second"
+    }
+}`));
+    const local = (id: string) => overridden.nodes.find((item) => item.id === id)!;
+    assert.equal(local("second").x - local("first").x - local("first").width, 9);
 });
 
 test("document layer spacing changes deterministic layered geometry", async () => {

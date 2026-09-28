@@ -54,16 +54,17 @@ function padding(value: Insets): string {
     return `[top=${value.top},left=${value.left},bottom=${value.bottom},right=${value.right}]`;
 }
 
-function nodeSpacing(container: AstNode | undefined, children: PositionedNode[], config: LayoutConfig): number {
+function nodeSpacing(container: AstNode | undefined, children: PositionedNode[], config: LayoutConfig, inheritedSpacing?: number): number {
     if (container?.layout?.nodeSpacing !== undefined) return container.layout.nodeSpacing;
+    if (inheritedSpacing !== undefined) return inheritedSpacing;
     if (!container) return config.nodeSpacing.root;
     return children.every((child) => isContainer(child.ast)) ? config.nodeSpacing.container : config.nodeSpacing.resource;
 }
 
-function layoutGrid(container: AstNode, children: PositionedNode[], config: LayoutConfig): LocalLayout {
+function layoutGrid(container: AstNode, children: PositionedNode[], config: LayoutConfig, inheritedSpacing?: number): LocalLayout {
     const columnCount = Math.min(container.layout?.gridColumns ?? Math.ceil(Math.sqrt(children.length)), children.length);
     const rowCount = Math.ceil(children.length / columnCount);
-    const spacing = nodeSpacing(container, children, config);
+    const spacing = nodeSpacing(container, children, config, inheritedSpacing);
     const columnWidths = Array.from({ length: columnCount }, () => 0);
     const rowHeights = Array.from({ length: rowCount }, () => 0);
     for (const [index, child] of children.entries()) {
@@ -96,13 +97,13 @@ function layoutGrid(container: AstNode, children: PositionedNode[], config: Layo
     };
 }
 
-async function layoutChildren(elk: ElkEngine, container: AstNode | undefined, children: PositionedNode[], ast: DocumentAst, nodesById: Map<string, AstNode>, config: LayoutConfig): Promise<LocalLayout> {
+async function layoutChildren(elk: ElkEngine, container: AstNode | undefined, children: PositionedNode[], ast: DocumentAst, nodesById: Map<string, AstNode>, config: LayoutConfig, inheritedSpacing?: number): Promise<LocalLayout> {
     if (!children.length) return { children, width: container ? dimensions(container).width : 0, height: container ? dimensions(container).height : 0 };
-    if (container && (container.layout?.gridColumns || container.layout?.direction === undefined)) return layoutGrid(container, children, config);
+    if (container && (container.layout?.gridColumns || container.layout?.direction === undefined)) return layoutGrid(container, children, config, inheritedSpacing);
     const layoutOptions: Record<string, string> = {
         "elk.algorithm": "layered",
         "elk.padding": padding(container ? insets(container, config) : config.padding.root),
-        "elk.spacing.nodeNode": String(nodeSpacing(container, children, config)),
+        "elk.spacing.nodeNode": String(nodeSpacing(container, children, config, inheritedSpacing)),
         "elk.layered.spacing.nodeNodeBetweenLayers": String(container?.layout?.layerSpacing ?? config.layerSpacing),
         "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
         "elk.direction": elkDirection(container?.layout?.direction ?? config.direction),
@@ -123,11 +124,12 @@ async function layoutChildren(elk: ElkEngine, container: AstNode | undefined, ch
     return { children, width: result.width ?? 0, height: result.height ?? 0 };
 }
 
-async function positionNode(elk: ElkEngine, node: AstNode, ast: DocumentAst, nodesById: Map<string, AstNode>, config: LayoutConfig): Promise<PositionedNode> {
+async function positionNode(elk: ElkEngine, node: AstNode, ast: DocumentAst, nodesById: Map<string, AstNode>, config: LayoutConfig, inheritedSpacing?: number): Promise<PositionedNode> {
     const children: PositionedNode[] = [];
-    for (const child of node.children) children.push(await positionNode(elk, child, ast, nodesById, config));
+    const childSpacing = node.layout?.nodeSpacing ?? inheritedSpacing;
+    for (const child of node.children) children.push(await positionNode(elk, child, ast, nodesById, config, childSpacing));
     if (!children.length) return { ast: node, children, x: 0, y: 0, ...dimensions(node) };
-    const local = await layoutChildren(elk, node, children, ast, nodesById, config);
+    const local = await layoutChildren(elk, node, children, ast, nodesById, config, inheritedSpacing);
     const size = dimensions(node);
     return { ast: node, children, x: 0, y: 0, width: Math.max(size.width, local.width), height: Math.max(size.height, local.height) };
 }
@@ -137,7 +139,7 @@ function flatten(nodes: PositionedNode[]): FlatLayoutNode[] {
     const visit = (node: PositionedNode, ox: number, oy: number, parentId?: string): void => {
         const x = ox + node.x;
         const y = oy + node.y;
-        result.push({ id: node.ast.id, symbol: node.ast.symbol, definition: node.ast.definition, label: node.ast.label, backgroundColor: node.ast.backgroundColor, borderStyle: node.ast.borderStyle, rounded: node.ast.rounded, layerId: node.ast.layerId, parentId, x, y, width: node.width, height: node.height, declarationOrder: node.ast.declarationOrder });
+        result.push({ id: node.ast.id, symbol: node.ast.symbol, definition: node.ast.definition, label: node.ast.label, displayLabel: node.ast.displayLabel, backgroundColor: node.ast.backgroundColor, borderStyle: node.ast.borderStyle, rounded: node.ast.rounded, layerId: node.ast.layerId, parentId, x, y, width: node.width, height: node.height, declarationOrder: node.ast.declarationOrder });
         node.children.forEach((child) => visit(child, x, y, node.ast.id));
     };
     nodes.forEach((node) => visit(node, 0, 0));
