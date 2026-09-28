@@ -155,6 +155,11 @@ test("AWS general icons render without resource tiles", () => {
     }
 });
 
+test("AWS certificate authority uses the certificate manager icon", () => {
+    const definition = resolveSymbol({ namespace: "aws", name: "certificate_authority" }).definition;
+    assert.equal(definition.drawio.shape, "mxgraph.aws4.certificate_manager_2");
+});
+
 test("core images render as image cells without a visible label", () => {
     const ast = parseDsl('core:image reference "https://example.com/reference.png"');
     const image = ast.nodes[0]!;

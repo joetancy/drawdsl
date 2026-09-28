@@ -902,6 +902,7 @@ const symbols: Record<string, SymbolDefinition> = {
     alb: shape("application_load_balancer", "#8C4FFF"),
     aoss: resource("elasticsearch_service"),
     backup: resource("backup", "#277116"),
+    certificate_authority: shape("certificate_manager_2", "#BF0816"),
     certificate_manager_2: shape("certificate_manager_2", "#BF0816"),
     certificate_manager_3: resource("certificate_manager_3", "#C7131F"),
     client_vpn: resource("client_vpn", "#5A30B5"),
