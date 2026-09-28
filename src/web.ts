@@ -48,6 +48,8 @@ const copyXml = document.querySelector<HTMLButtonElement>("#copy-xml")!;
 const downloadDsl = document.querySelector<HTMLButtonElement>("#download-dsl")!;
 const downloadDrawio = document.querySelector<HTMLButtonElement>("#download-drawio")!;
 const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
+const autoRefresh = document.querySelector<HTMLInputElement>("#auto-refresh")!;
+const refreshPreview = document.querySelector<HTMLButtonElement>("#refresh-preview")!;
 const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
 const savedMenu = document.querySelector<HTMLDetailsElement>("#saved-menu")!;
 let errorLine: number | undefined;
@@ -123,6 +125,7 @@ const viewerReady = new Promise<void>((resolve, reject) => {
 });
 viewerReady.catch(() => {});
 let sourceRevision = 0;
+let renderedRevision = -1;
 let debounce: ReturnType<typeof setTimeout>;
 let darkMode = false;
 let latestXml = "";
@@ -326,6 +329,8 @@ async function render(): Promise<void> {
         if (seen !== sourceRevision) return;
 
         showPreview(xml);
+        renderedRevision = seen;
+        refreshPreview.disabled = true;
         setPreviewStatus("Up to date", "success");
         if (!savedFailed) setStatus("");
         setErrorLine(undefined);
@@ -496,6 +501,17 @@ formatDslButton.addEventListener("click", () => {
         reportError(error, false);
     }
 });
+autoRefresh.addEventListener("change", () => {
+    refreshPreview.hidden = autoRefresh.checked;
+    if (autoRefresh.checked) {
+        clearTimeout(debounce);
+        void render();
+    } else {
+        clearTimeout(debounce);
+        refreshPreview.disabled = sourceRevision === renderedRevision;
+    }
+});
+refreshPreview.addEventListener("click", () => { void render(); });
 gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
     const label = showingXml ? "draw.io XML output (read-only)" : "DrawDSL source";
@@ -587,8 +603,13 @@ view.dom.addEventListener("input", () => {
     markSourceChanged();
     scheduleShareUrl();
     updateEditor();
-    clearTimeout(debounce);
-    debounce = setTimeout(() => void render(), 120);
+    if (autoRefresh.checked) {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => void render(), 120);
+    } else {
+        refreshPreview.disabled = false;
+        setPreviewStatus("Changes pending · automatic refresh is off", "warning");
+    }
 });
 foldToggle.addEventListener("click", () => {
     if (showingXml || !foldRegions.length) return;

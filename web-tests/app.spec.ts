@@ -114,6 +114,28 @@ test("preview automatically recompiles after source edits", async ({ page }) => 
     await expect(page.locator("#preview-status")).toContainText("Up to date");
 });
 
+test("manual preview mode waits for Refresh and can be re-enabled", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    const previewXml = async (): Promise<string> => {
+        const dataset = await page.locator("#preview .mxgraph").getAttribute("data-mxgraph");
+        return dataset ? JSON.parse(dataset).xml as string : "";
+    };
+    const initial = await previewXml();
+    await page.uncheck("#auto-refresh");
+    await page.locator("#source .cm-content").fill('core:box item "Manual preview update"');
+    await expect(page.locator("#preview-status")).toContainText("automatic refresh is off");
+    await expect(page.locator("#refresh-preview")).toBeEnabled();
+    await expect.poll(previewXml).toBe(initial);
+    await page.click("#refresh-preview");
+    await expect.poll(previewXml).toContain("Manual preview update");
+    await expect(page.locator("#refresh-preview")).toBeDisabled();
+    await page.check("#auto-refresh");
+    await expect(page.locator("#refresh-preview")).toBeHidden();
+});
+
 test("xml view switches and returns to dsl", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);
@@ -227,6 +249,8 @@ test("keyboard can leave the editor in both directions", async ({ page }) => {
     await page.locator("#source .cm-content").click();
     await page.keyboard.press("Escape");
     await expect(page.locator("#format-dsl")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#auto-refresh")).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(page.locator("#xml-toggle")).toBeFocused();
 });
@@ -376,6 +400,14 @@ test("workbench disclosures, theme, dialog, and preview status stay in sync", as
     await page.click("#guide-close");
     await expect(page.locator("#guide")).toBeHidden();
     await expect(page.locator("#guide-toggle")).toBeFocused();
+    await expect(page.locator("#skill-toggle")).toBeVisible();
+    await expect(page.locator("#help-menu #skill-toggle")).toHaveCount(0);
+    await page.click("#skill-toggle");
+    await expect(page.locator("#skill")).toBeVisible();
+    await expect(page.locator("#skill")).toContainText("DrawDSL");
+    await page.click("#skill-close");
+    await expect(page.locator("#skill")).toBeHidden();
+    await expect(page.locator("#skill-toggle")).toBeFocused();
 
     await page.click("#theme-toggle");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
