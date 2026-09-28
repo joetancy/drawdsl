@@ -44,7 +44,7 @@ source <-.-> target     # bidirectional, dashed
 
 Linear relationships may be chained: `internet --> gateway --> handler`. Each segment is a separate edge. Use separate binary edges when labels or per-edge options are required.
 
-Define reusable 3- or 6-digit hex colors at document level, then set edge color and width in bracketed options. Use `background=colorName` in a `core:group` declaration to set its fill:
+Define reusable 3- or 6-digit hex colors at document level, then set edge color and width in bracketed options. `core:group` supports `background=colorName`, `border=solid|dashed|dotted`, and opt-in `rounded=true`; borders default to solid with sharp corners:
 
 ```text
 color primary = #f90

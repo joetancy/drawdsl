@@ -18,10 +18,11 @@ function nodeStyle(node: FlatLayoutNode): string {
     }
     if (node.definition.role === "container") {
         const fill = node.backgroundColor ?? drawio.fill;
+        const coreGroup = node.symbol.namespace === "core" && node.symbol.name === "group";
         return styleString([
             "points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]]",
-            "outlineConnect=0", "gradientColor=none", "html=1", "whiteSpace=wrap", "fontSize=12", "fontStyle=0", "container=1", "pointerEvents=0", "collapsible=0", "recursiveResize=0", `shape=${drawio.shape}`, "verticalAlign=top", "align=left", "spacingLeft=30", "dashed=0",
-            ...(fill ? [`fillColor=${fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : []), ...(drawio.styles ?? []),
+            "outlineConnect=0", "gradientColor=none", "html=1", "whiteSpace=wrap", "fontSize=12", "fontStyle=0", "container=1", "pointerEvents=0", "collapsible=0", "recursiveResize=0", `shape=${drawio.shape}`, "verticalAlign=top", "align=left", "spacingLeft=30",
+            ...(fill ? [`fillColor=${fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : []), ...(drawio.styles ?? []), ...(coreGroup && node.borderStyle ? [`dashed=${node.borderStyle === "solid" ? "0" : "1"}`, ...(node.borderStyle === "dotted" ? ["dashPattern=1 1"] : [])] : []), ...(coreGroup ? [`rounded=${node.rounded ? "1" : "0"}`] : []),
         ]);
     }
     if (node.definition.role === "annotation") {

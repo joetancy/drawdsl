@@ -275,6 +275,19 @@ core:group services "Services" [background=panel] {
     assert.throws(() => parseDsl("col 2"), /must be inside a container/);
 });
 
+test("core group borders are sharp by default and support solid, dashed, dotted, and rounded options", async () => {
+    const xmlFor = async (options = "") => {
+        const layout = await layoutDocument(parseDsl(`core:group services${options ? ` [${options}]` : ""} {\naws:lambda worker\n}`));
+        return renderDrawio(layout.nodes, layout.edges);
+    };
+    assert.match(await xmlFor(), /rounded=0/);
+    assert.match(await xmlFor("border=solid, rounded=true"), /dashed=0.*rounded=1/);
+    assert.match(await xmlFor("border=dashed"), /dashed=1/);
+    assert.match(await xmlFor("border=dotted"), /dashed=1;dashPattern=1 1/);
+    assert.throws(() => parseDsl("core:group g [border=other] {\naws:lambda fn\n}"), /border must be solid, dashed, or dotted/);
+    assert.throws(() => parseDsl("core:group g [rounded=yes] {\naws:lambda fn\n}"), /rounded must be true or false/);
+});
+
 test("grid columns preserve declaration order and center mixed-size groups", async () => {
     const ast = parseDsl(`core:layout application_grid {
     grid-columns 3

@@ -35,7 +35,7 @@ export const coreProvider: SymbolProvider = {
                 shape: "rectangle",
                 fill: "none",
                 stroke: "#879196",
-                styles: ["rounded=1", "fontColor=#232F3E"],
+                styles: ["fontColor=#232F3E"],
             },
         },
         layout: {

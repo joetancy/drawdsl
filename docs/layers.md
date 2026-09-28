@@ -52,6 +52,8 @@ An explicit edge color or width overrides its layer default. Without an edge or 
 
 Layer blocks must be at document level. They can contain nodes, groups, edges, comments, and blank lines, but not layout directives, color declarations, or other layers. Groups retain their normal container ownership and are shown or hidden with their layer.
 
+`core:group` borders are solid and corners are sharp by default. Set `[border=dashed]` or `[border=dotted]` to change the border, or use `[rounded=true]` for rounded corners. These options can be combined with `background`, for example `[background=panel, border=dotted, rounded=true]`.
+
 ## Assign an edge outside a layer block
 
 ```text

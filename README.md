@@ -84,11 +84,11 @@ source --- target [color=#123ABC, width=2]
 
 Color constants must be declared at document level before use. Edge width is a positive integer from 1 to 10000. An edge can inherit its color and width from a connection layer. Without an edge or layer default, width is 1 and color is draw.io's default.
 
-Set a `core:group` background using the same constants or a hex value:
+Set a `core:group` background and border style. Borders are solid and corners sharp by default; use `border=dashed` or `border=dotted`, and opt in to rounded corners with `rounded=true`:
 
 ```text
 color panel = #EEF2F7
-core:group services "Services" [background=panel] {
+core:group services "Services" [background=panel, border=dashed, rounded=true] {
     col 2
     aws:lambda api
     aws:lambda worker

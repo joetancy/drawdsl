@@ -63,6 +63,8 @@ export type AstNode = {
     definition: SymbolDefinition;
     label: string;
     backgroundColor?: string;
+    borderStyle?: "solid" | "dashed" | "dotted";
+    rounded?: boolean;
     layerId?: string;
     parentId?: string;
     children: AstNode[];
@@ -102,6 +104,8 @@ export type FlatLayoutNode = {
     definition: SymbolDefinition;
     label: string;
     backgroundColor?: string;
+    borderStyle?: "solid" | "dashed" | "dotted";
+    rounded?: boolean;
     layerId?: string;
     parentId?: string;
     x: number;

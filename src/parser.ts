@@ -306,13 +306,29 @@ export function parseDsl(source: string): DocumentAst {
         const quotedLabel = declarationMatch[4];
         const opensBlock = Boolean(declarationMatch[6]);
         let backgroundColor: string | undefined;
+        let borderStyle: "solid" | "dashed" | "dotted" | undefined;
+        let rounded: boolean | undefined;
         const rawGroupOptions = declarationMatch[5];
         if (rawGroupOptions !== undefined) {
-            if (symbol.ref.namespace !== "core" || symbol.ref.name !== "group") throw new DslError(`Line ${lineNumber}: background color is only supported on core:group`, lineNumber);
-            const option = rawGroupOptions.trim().match(/^background\s*=\s*(\S+)$/);
-            if (!option) throw new DslError(`Line ${lineNumber}: invalid group option: ${rawGroupOptions}`, lineNumber);
-            backgroundColor = colorValue(option[1]!, colors);
-            if (!backgroundColor) throw new DslError(`Line ${lineNumber}: invalid or unknown group background color: ${option[1]}`, lineNumber);
+            if (symbol.ref.namespace !== "core" || symbol.ref.name !== "group") throw new DslError(`Line ${lineNumber}: group options are only supported on core:group`, lineNumber);
+            const seen = new Set<string>();
+            for (const rawOption of rawGroupOptions.split(",")) {
+                const option = rawOption.trim().match(/^(background|border|rounded)\s*=\s*(\S+)$/);
+                if (!option) throw new DslError(`Line ${lineNumber}: invalid group option: ${rawOption.trim()}`, lineNumber);
+                const [, key, value] = option as [string, string, string];
+                if (seen.has(key)) throw new DslError(`Line ${lineNumber}: duplicate group ${key}`, lineNumber);
+                seen.add(key);
+                if (key === "background") {
+                    backgroundColor = colorValue(value, colors);
+                    if (!backgroundColor) throw new DslError(`Line ${lineNumber}: invalid or unknown group background color: ${value}`, lineNumber);
+                } else if (key === "border") {
+                    if (value !== "solid" && value !== "dashed" && value !== "dotted") throw new DslError(`Line ${lineNumber}: group border must be solid, dashed, or dotted`, lineNumber);
+                    borderStyle = value;
+                } else {
+                    if (value !== "true" && value !== "false") throw new DslError(`Line ${lineNumber}: group rounded must be true or false`, lineNumber);
+                    rounded = value === "true";
+                }
+            }
         }
         const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (symbol.ref.namespace === "core" && symbol.ref.name === "image") {
@@ -347,6 +363,8 @@ export function parseDsl(source: string): DocumentAst {
             definition: symbol.definition,
             label,
             ...(backgroundColor ? { backgroundColor } : {}),
+            ...(borderStyle ? { borderStyle } : {}),
+            ...(rounded !== undefined ? { rounded } : {}),
             ...(activeLayer ? { layerId: activeLayer.id } : {}),
             parentId: parent?.id,
             children: [],
