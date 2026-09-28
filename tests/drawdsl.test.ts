@@ -161,6 +161,7 @@ test("core images render as image cells without a visible label", () => {
     const xml = renderDrawio([{ id: image.id, symbol: image.symbol, definition: image.definition, label: image.label, x: 0, y: 0, width: 160, height: 80, declarationOrder: 0 }], []);
     assert.match(xml, /shape=image/);
     assert.match(xml, /imageAspect=1/);
+    assert.match(xml, /verticalLabelPosition=bottom;verticalAlign=top;align=center/);
     assert.match(xml, /image=https:\/\/example.com\/reference.png/);
     assert.match(xml, /value=""/);
 });

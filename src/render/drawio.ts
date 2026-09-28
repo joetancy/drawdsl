@@ -14,7 +14,7 @@ function nodeStyle(node: FlatLayoutNode): string {
     const drawio = node.definition.drawio;
     if (node.symbol.namespace === "core" && node.symbol.name === "image") {
         if (node.label.includes(";")) throw new Error(`image URL must not contain ";": ${node.id}`);
-        return styleString(["shape=image", "imageAspect=1", "aspect=fixed", "html=1", `image=${node.label}`, ...(drawio.styles ?? [])]);
+        return styleString(["shape=image", "imageAspect=1", "aspect=fixed", "html=1", "verticalLabelPosition=bottom", "verticalAlign=top", "align=center", `image=${node.label}`, ...(drawio.styles ?? [])]);
     }
     if (node.definition.role === "container") {
         const fill = node.backgroundColor ?? drawio.fill;
