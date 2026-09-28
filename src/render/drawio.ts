@@ -25,6 +25,7 @@ function nodeStyle(node: FlatLayoutNode): string {
             ...(fill ? [`fillColor=${fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : []), ...(drawio.styles ?? []), ...(coreGroup && node.borderStyle ? [`dashed=${node.borderStyle === "solid" ? "0" : "1"}`, ...(node.borderStyle === "dotted" ? ["dashPattern=1 1"] : [])] : []), ...(coreGroup ? [`rounded=${node.rounded ? "1" : "0"}`] : []),
         ]);
     }
+    if (drawio.style) return drawio.style;
     if (node.definition.role === "annotation") {
         return styleString([`shape=${drawio.shape}`, ...(drawio.styles ?? []), ...(drawio.fill ? [`fillColor=${drawio.fill}`] : []), ...(drawio.stroke ? [`strokeColor=${drawio.stroke}`] : [])]);
     }

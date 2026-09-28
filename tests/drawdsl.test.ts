@@ -9,6 +9,8 @@ import { layoutDocument } from "../src/layout/index.js";
 import { enforceGlobalEdgeSpacing } from "../src/layout/routing.js";
 import { DEFAULT_LAYOUT_CONFIG } from "../src/config.js";
 import { compileDrawDsl } from "../src/compiler.js";
+import { DRAWIO_RESOURCES } from "../src/generated/drawio-resources.js";
+import { getResourceShape, normalizeResources } from "../scripts/normalize-drawio-resources.js";
 
 test("requires namespaces and resolves aliases", () => {
     const ast = parseDsl('aws:apigw gateway "Gateway"\ncore:text note "Hello"\n gateway --> note');
@@ -143,6 +145,37 @@ test("provider styles retain fully qualified draw.io shapes", () => {
     assert.equal(alb.definition.drawio.shape, "mxgraph.aws4.application_load_balancer");
     assert.equal(nlb.definition.drawio.fill, "#8C4FFF");
     assert.equal(alb.definition.drawio.fill, "#8C4FFF");
+});
+
+test("cloud catalogue styles resolve intact across all supported providers", async () => {
+    assert.equal(getResourceShape("shape=mxgraph.aws4.lambda;"), "mxgraph.aws4.lambda");
+    assert.equal(getResourceShape("shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;"), "mxgraph.aws4.lambda");
+    assert.equal(getResourceShape("shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_ec2_instance_contents;"), "mxgraph.aws4.group_ec2_instance_contents");
+    assert.ok(DRAWIO_RESOURCES["aws:lambda"]);
+    assert.ok(DRAWIO_RESOURCES["aws:s3"]);
+    assert.ok(DRAWIO_RESOURCES["aws:dynamodb"]);
+    assert.ok(DRAWIO_RESOURCES["azure:virtual_machine"]);
+    assert.ok(DRAWIO_RESOURCES["gcp:big_query"]);
+    assert.equal(resolveSymbol({ namespace: "aws", name: "api-gateway" }).ref.name, "api_gateway");
+    assert.ok(Object.keys(DRAWIO_RESOURCES).every((id) => /^(aws|azure|gcp):/.test(id)));
+    assert.equal(Object.keys(DRAWIO_RESOURCES).some((id) => /^(k8s|cisco|uml|bpmn|network|electrical):/.test(id)), false);
+    for (const id of ["aws:lambda", "azure:virtual_machine", "gcp:big_query"] as const) {
+        const resource = DRAWIO_RESOURCES[id];
+        const layout = await layoutDocument(parseDsl(`${id} item`));
+        const xml = renderDrawio(layout.nodes, []);
+        assert.ok(xml.includes(`style="${resource.style.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}"`), id);
+    }
+});
+
+test("normalizer preserves and reports materially different name collisions", () => {
+    const variants = ["#ffffff", "#123456"].map((fillColor) => ({
+        provider: "azure", title: "Queue", tags: "queue", width: 60, height: 60, type: "vertex", drawioShape: "mxgraph.azure.queue",
+        style: `shape=mxgraph.azure.queue;fillColor=${fillColor};`,
+    }));
+    const result = normalizeResources(variants);
+    assert.equal(result.collisionsResolved, 1);
+    assert.equal(Object.keys(result.resources).length, 2);
+    assert.ok(result.resources["azure:queue_fill_123456"]);
 });
 
 test("AWS general icons render without resource tiles", () => {
