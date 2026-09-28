@@ -23,7 +23,7 @@ layer events "Event flow" [color=eventColor, visible=false] {
 }
 ```
 
-The Architecture layer contains the nodes and their container hierarchy. Each named layer contains its edges and edge labels. Edges without an assignment belong to the implicit Connections layer.
+Nodes and groups declared at document level belong to Architecture. A named layer can also contain its own nodes, groups, and edges; groups keep their child hierarchy. Edges without an assignment belong to the implicit Connections layer.
 
 The complete example is in [`examples/flows.drawdsl`](../examples/flows.drawdsl).
 
@@ -31,6 +31,9 @@ The complete example is in [`examples/flows.drawdsl`](../examples/flows.drawdsl)
 
 ```text
 layer layer_id "Optional display name" [color=colorName, width=2, visible=false] {
+    core:group group_id "Optional group" {
+        core:text node_id "Optional node"
+    }
     source --> target : Optional edge label
 }
 ```
@@ -47,7 +50,7 @@ The display name defaults to the layer ID. It supports the same quoted text and 
 
 An explicit edge color or width overrides its layer default. Without an edge or layer width, the renderer uses width 1.
 
-Layer blocks must be at document level and can contain only edges, comments, or blank lines. They cannot contain nodes, containers, layout directives, color declarations, or other layers. They do not create a visible box or affect container ownership.
+Layer blocks must be at document level. They can contain nodes, groups, edges, comments, and blank lines, but not layout directives, color declarations, or other layers. Groups retain their normal container ownership and are shown or hidden with their layer.
 
 ## Assign an edge outside a layer block
 

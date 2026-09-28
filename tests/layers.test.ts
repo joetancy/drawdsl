@@ -94,10 +94,12 @@ test("unknown, duplicate, reserved and conflicting layer assignments fail", () =
     rejects(`${nodes}layer requests {\na --> b [layer=connections]\n}`, /conflicts with containing layer/);
 });
 
-test("layer scopes reject nodes, directives, nesting and missing closing braces", () => {
-    rejects(`${nodes}layer requests {\ncore:text extra\n}`, /only edges are allowed/, 5);
-    rejects(`${nodes}layer requests {\ndirection down\n}`, /only edges are allowed/);
-    rejects(`${nodes}layer requests {\ncolor green = #123\n}`, /only edges are allowed/);
+test("layer scopes accept nodes and groups but reject directives, nesting and missing closing braces", () => {
+    const ast = parseDsl("layer requests {\ncore:group services {\ncore:text api\n}\n}");
+    assert.equal(ast.nodes[0]!.layerId, "requests");
+    assert.equal(ast.nodes[0]!.children[0]!.layerId, "requests");
+    rejects(`${nodes}layer requests {\ndirection down\n}`, /only nodes, groups, and edges/);
+    rejects(`${nodes}layer requests {\ncolor green = #123\n}`, /only nodes, groups, and edges/);
     rejects(`${nodes}layer requests {\nlayer events {\n}\n}`, /cannot be nested/);
     rejects("core:group services {\nlayer requests {\n}\n}", /must be top-level/);
     rejects(`${nodes}layer requests {\na --> b`, /unclosed layer: requests/, 4);

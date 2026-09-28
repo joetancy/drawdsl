@@ -197,7 +197,9 @@ export function parseDsl(source: string): DocumentAst {
         // Parse a complete chain first: a selector colon is not an edge label separator.
         const chain = parseEdgeChain(line);
         const edgeMatch = chain ? null : line.match(EDGE_RE);
-        if (activeLayer && !edgeMatch && !chain) throw new DslError(`Line ${lineNumber}: only edges are allowed inside layer ${activeLayer.id}`, lineNumber);
+        if (activeLayer && !edgeMatch && !chain && (COLOR_DECL_RE.test(line) || DEFAULT_LAYOUT_RE.test(line) || DIRECTION_RE.test(line) || GRID_COLUMNS_RE.test(line) || LAYOUT_SETTING_RE.test(line))) {
+            throw new DslError(`Line ${lineNumber}: only nodes, groups, and edges are allowed inside layer ${activeLayer.id}`, lineNumber);
+        }
         const colorMatch = line.match(COLOR_DECL_RE);
         if (colorMatch) {
             if (stack.length) throw new DslError(`Line ${lineNumber}: color constants must be top-level`, lineNumber);
@@ -345,6 +347,7 @@ export function parseDsl(source: string): DocumentAst {
             definition: symbol.definition,
             label,
             ...(backgroundColor ? { backgroundColor } : {}),
+            ...(activeLayer ? { layerId: activeLayer.id } : {}),
             parentId: parent?.id,
             children: [],
             declarationOrder: order++,

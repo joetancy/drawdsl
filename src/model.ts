@@ -63,6 +63,7 @@ export type AstNode = {
     definition: SymbolDefinition;
     label: string;
     backgroundColor?: string;
+    layerId?: string;
     parentId?: string;
     children: AstNode[];
     layout?: ContainerLayoutOptions;
@@ -101,6 +102,7 @@ export type FlatLayoutNode = {
     definition: SymbolDefinition;
     label: string;
     backgroundColor?: string;
+    layerId?: string;
     parentId?: string;
     x: number;
     y: number;

@@ -42,6 +42,12 @@ test("compiler exports named root layers and cross-layer endpoints", async () =>
     assert.equal((xml.match(/edge="1"/g) ?? []).length, 2);
 });
 
+test("nodes and groups declared in a layer are parented to that layer", async () => {
+    const xml = await compileDrawDsl('layer services {\ncore:group backend {\naws:lambda handler\n}\n}');
+    assert.match(cell(xml, "backend"), /vertex="1" parent="layer:services"/);
+    assert.match(cell(xml, "handler"), /vertex="1" parent="backend"/);
+});
+
 test("initial visibility changes neither placement nor routing", async () => {
     const hiddenAst = parseDsl(source);
     const shownAst = parseDsl(source.replace("visible=false", "visible=true"));
