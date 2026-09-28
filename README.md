@@ -4,6 +4,27 @@
 
 `drawdsl` converts a small, namespaced architecture language into native draw.io XML. It ships with AWS icons ☁️, editable text, remote images and groups, ELK orthogonal routing, and first-class connection layers for switching between data flows without duplicating the architecture.
 
+## Native cloud resources
+
+draw.io is the canonical source for cloud resource styles. DrawDSL extracts only AWS, Microsoft Azure, and Google Cloud resources; other draw.io libraries are intentionally excluded. Public namespaces map to current draw.io library families (`mxgraph.aws4` → `aws`, `mxgraph.azure` / `mxgraph.azure2` → `azure`, and `mxgraph.gcp` / `mxgraph.gcp2` → `gcp`). Where Azure/GCP libraries contain a direct duplicate, the newer `*2` library takes precedence; materially different styles are retained as deterministic variants.
+
+Regenerate the catalogue after a draw.io release with:
+
+```bash
+npm run resources:update
+npm run resources:search -- lambda
+npm run resources:search -- azure
+```
+
+The extractor runs draw.io's application in jsdom and captures palette style strings, including dynamically loaded stencils. `src/generated/drawio-resources.raw.json`, `src/generated/drawio-resources.json`, and `src/generated/drawio-resources.ts` are generated files and must not be edited manually. Hand-maintained aliases live separately from that catalogue.
+
+```drawdsl
+aws:lambda lambda "Lambda"
+aws:dynamodb db "DynamoDB"
+azure:virtual_machine worker "Azure VM"
+gcp:big_query warehouse "BigQuery"
+```
+
 ## Quick start
 
 ```bash

@@ -33,6 +33,8 @@ export type SymbolRef = {
 
 export type DrawioSymbolStyle = {
     shape: string;
+    /** Complete palette style; when present the renderer emits it verbatim. */
+    style?: string;
     resIcon?: string;
     fill?: string;
     stroke?: string;
@@ -48,6 +50,8 @@ export type SymbolDefinition = {
     render?: boolean;
     widthScale?: number;
     heightScale?: number;
+    width?: number;
+    height?: number;
     defaultLabel?: string;
 };
 

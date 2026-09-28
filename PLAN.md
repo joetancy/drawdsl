@@ -1,5 +1,16 @@
 # DrawDSL connection layers plan
 
+## Cloud resource catalogue plan
+
+- [x] Study DrawDSL symbols, parser, renderer, tests, and official drawio-mcp extractor
+- [x] Add scoped draw.io extraction for AWS, Azure, and GCP
+- [x] Normalize provider shapes, report collisions, and generate deterministic registry files
+- [x] Add aliases, resource search, and renderer integration
+- [x] Validate scope and required cloud resources; add extraction/renderer tests
+- [x] Document catalogue regeneration and run project checks
+
+Latest extraction: 1,577 resources (AWS 1,355; Azure 109; GCP 113); repeated generation produced identical hashes. Periodic GitHub regeneration is deferred until the catalogue process is adopted in CI.
+
 Base revision: `3fe157d3c4f2ba2e898146c70166588fc2735ec6`.
 Branch: `feat/flow-layers`.
 

@@ -12,7 +12,7 @@ export function dimensions(node: AstNode): { width: number; height: number } {
             height: lines.length * DRAWING_DEFAULTS.textBox.lineHeight + DRAWING_DEFAULTS.textBox.verticalPadding,
         };
     }
-    return { width: DRAWING_DEFAULTS.iconSize * (node.definition.widthScale ?? 1), height: DRAWING_DEFAULTS.iconSize * (node.definition.heightScale ?? 1) };
+    return { width: node.definition.width ?? DRAWING_DEFAULTS.iconSize * (node.definition.widthScale ?? 1), height: node.definition.height ?? DRAWING_DEFAULTS.iconSize * (node.definition.heightScale ?? 1) };
 }
 
 export function flattenAst(nodes: AstNode[]): Map<string, AstNode> {
