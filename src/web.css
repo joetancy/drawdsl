@@ -217,6 +217,8 @@ main {
 .panel-title > div { display: grid; min-width: 0; gap: 2px; }
 .panel-title h2 { margin: 0; font-size: 14px; font-weight: 650; line-height: 18px; letter-spacing: -.01em; }
 .mode-label, .preview-status { color: var(--text-tertiary); font-size: 11px; line-height: 15px; }
+.preview-status { display: inline-flex; align-items: center; gap: 6px; }
+.preview-status[data-busy="true"]::before { width: 11px; height: 11px; flex: 0 0 auto; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; content: ""; }
 .mode-label.read-only { color: var(--warning); }
 .editor-actions { flex: 0 0 auto; gap: 4px; }
 .editor-actions .toolbar-button { min-height: 34px; padding: 0 9px; font-size: 12px; }

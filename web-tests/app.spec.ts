@@ -114,6 +114,21 @@ test("preview automatically recompiles after source edits", async ({ page }) => 
     await expect(page.locator("#preview-status")).toContainText("Up to date");
 });
 
+test("rendering status shows and clears the progress spinner", async ({ page }) => {
+    await page.route("https://viewer.diagrams.net/js/viewer-static.min.js", async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await route.fulfill({ contentType: "application/javascript", body: VIEWER_STUB });
+    });
+    await stubClipboard(page);
+    await page.goto("./", { waitUntil: "domcontentloaded" });
+    const previewStatus = page.locator("#preview-status");
+    await expect(previewStatus).toHaveAttribute("aria-busy", "true");
+    await expect.poll(() => previewStatus.evaluate((element) => getComputedStyle(element, "::before").animationName)).toBe("spin");
+    await ready(page);
+    await expect(previewStatus).toHaveAttribute("aria-busy", "false");
+    await expect.poll(() => previewStatus.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
+});
+
 test("manual preview mode waits for Refresh and can be re-enabled", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);

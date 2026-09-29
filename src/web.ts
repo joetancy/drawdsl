@@ -68,9 +68,11 @@ function setStatus(message: string, kind: "info" | "success" | "warning" | "erro
     status.dataset.kind = kind;
 }
 
-function setPreviewStatus(message: string, kind: "info" | "success" | "warning" | "error" = "info"): void {
+function setPreviewStatus(message: string, kind: "info" | "success" | "warning" | "error" = "info", busy = false): void {
     previewStatus.textContent = message;
     previewStatus.dataset.kind = kind;
+    previewStatus.dataset.busy = String(busy);
+    previewStatus.setAttribute("aria-busy", String(busy));
 }
 
 function setButtonLabel(button: HTMLButtonElement, label: string): void {
@@ -301,7 +303,7 @@ function showPreview(xml: string): void {
 async function render(): Promise<void> {
     const seen = sourceRevision;
     const src = showingXml ? dslSource : getEditorFull();
-    setPreviewStatus("Updating preview…");
+    setPreviewStatus("Updating preview…", "info", true);
     try {
         await routerReady;
         if (seen !== sourceRevision) return;
