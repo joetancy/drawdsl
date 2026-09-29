@@ -350,23 +350,87 @@ function clearContainerBorders(paths: RoutePath[], borders: LineSegment[], obsta
     }
 }
 
-function conflictScore(paths: RoutePath[], edgeSpacing: number): number {
-    const segments = routeSegments(paths);
-    let score = 0;
-    for (let first = 0; first < segments.length; first += 1) {
-        for (let second = first + 1; second < segments.length; second += 1) {
-            const a = segments[first]!;
-            const b = segments[second]!;
-            if (a.path === b.path || !tooClose(a, b, edgeSpacing)) continue;
-            const aStart = a.horizontal ? a.start.x : a.start.y;
-            const aEnd = a.horizontal ? a.end.x : a.end.y;
-            const bStart = b.horizontal ? b.start.x : b.start.y;
-            const bEnd = b.horizontal ? b.end.x : b.end.y;
-            const distance = a.horizontal ? Math.abs(a.start.y - b.start.y) : Math.abs(a.start.x - b.start.x);
-            score += overlapLength(aStart, aEnd, bStart, bEnd) * (edgeSpacing - distance) / edgeSpacing;
-        }
+function segmentPenalty(a: Segment, b: Segment, spacing: number, kind: "conflict" | "excess"): number {
+    if (a.path === b.path || a.horizontal !== b.horizontal) return 0;
+    const overlap = overlapLength(a.horizontal ? a.start.x : a.start.y, a.horizontal ? a.end.x : a.end.y,
+        b.horizontal ? b.start.x : b.start.y, b.horizontal ? b.end.x : b.end.y);
+    if (overlap <= 0) return 0;
+    const distance = Math.abs((a.horizontal ? a.start.y : a.start.x) - (b.horizontal ? b.start.y : b.start.x));
+    return kind === "conflict" ? distance < spacing ? overlap * (spacing - distance) / spacing : 0
+        : distance > spacing ? overlap * (distance - spacing) : 0;
+}
+
+// Index by orientation and axial interval. A proposed shift only changes pairs touching its own path.
+class SegmentIndex {
+    private readonly buckets = new Map<string, Set<Segment>>();
+    private readonly byPath = new Map<RoutePath, Segment[]>();
+    private readonly bucketSize: number;
+    conflict = 0;
+    excess = 0;
+
+    constructor(paths: RoutePath[], private readonly spacing: number) {
+        this.bucketSize = Math.max(100, spacing * 5);
+        for (const path of paths) this.replace(path);
     }
-    return score;
+
+    private keys(segment: Segment): string[] {
+        const start = segment.horizontal ? segment.start.x : segment.start.y;
+        const end = segment.horizontal ? segment.end.x : segment.end.y;
+        const keys: string[] = [];
+        for (let bucket = Math.floor(Math.min(start, end) / this.bucketSize); bucket <= Math.floor(Math.max(start, end) / this.bucketSize); bucket += 1) {
+            keys.push(`${segment.horizontal ? "h" : "v"}:${bucket}`);
+        }
+        return keys;
+    }
+
+    private nearby(segment: Segment): Set<Segment> {
+        const result = new Set<Segment>();
+        for (const key of this.keys(segment)) for (const other of this.buckets.get(key) ?? []) result.add(other);
+        return result;
+    }
+
+    score(path: RoutePath, points: Point[], kind: "conflict" | "excess"): number {
+        let score = 0;
+        for (let index = 0; index < points.length - 1; index += 1) {
+            const start = points[index]!;
+            const end = points[index + 1]!;
+            if (start.x !== end.x && start.y !== end.y) continue;
+            const segment: Segment = { path, index, start, end, horizontal: start.y === end.y };
+            for (const other of this.nearby(segment)) score += segmentPenalty(segment, other, this.spacing, kind);
+        }
+        return score;
+    }
+
+    replace(path: RoutePath): void {
+        const old = this.byPath.get(path) ?? [];
+        for (const segment of old) {
+            for (const other of this.nearby(segment)) {
+                this.conflict -= segmentPenalty(segment, other, this.spacing, "conflict");
+                this.excess -= segmentPenalty(segment, other, this.spacing, "excess");
+            }
+            for (const key of this.keys(segment)) {
+                const bucket = this.buckets.get(key)!;
+                bucket.delete(segment);
+                if (!bucket.size) this.buckets.delete(key);
+            }
+        }
+        const segments = routeSegments([path]);
+        for (const segment of segments) {
+            for (const other of this.nearby(segment)) {
+                this.conflict += segmentPenalty(segment, other, this.spacing, "conflict");
+                this.excess += segmentPenalty(segment, other, this.spacing, "excess");
+            }
+        }
+        // Other routes stay indexed; only this route's pair contributions change.
+        this.byPath.set(path, segments);
+        for (const segment of segments) for (const key of this.keys(segment)) {
+            let bucket = this.buckets.get(key);
+            if (!bucket) { bucket = new Set(); this.buckets.set(key, bucket); }
+            bucket.add(segment);
+        }
+        if (Math.abs(this.conflict) < 1e-7) this.conflict = 0;
+        if (Math.abs(this.excess) < 1e-7) this.excess = 0;
+    }
 }
 
 function laneOffset(segment: Segment, other: Segment, spacing: number): number {
@@ -375,26 +439,6 @@ function laneOffset(segment: Segment, other: Segment, spacing: number): number {
     const otherLane = lane(other);
     const side = Math.sign(current - otherLane) || (segment.path.edge.declarationOrder > other.path.edge.declarationOrder ? 1 : -1);
     return otherLane + side * spacing - current;
-}
-
-function excessSpacingScore(paths: RoutePath[], edgeSpacing: number): number {
-    const segments = routeSegments(paths);
-    let score = 0;
-    for (let first = 0; first < segments.length; first += 1) {
-        for (let second = first + 1; second < segments.length; second += 1) {
-            const a = segments[first]!;
-            const b = segments[second]!;
-            if (a.path === b.path || a.horizontal !== b.horizontal) continue;
-            const aStart = a.horizontal ? a.start.x : a.start.y;
-            const aEnd = a.horizontal ? a.end.x : a.end.y;
-            const bStart = b.horizontal ? b.start.x : b.start.y;
-            const bEnd = b.horizontal ? b.end.x : b.end.y;
-            const overlap = overlapLength(aStart, aEnd, bStart, bEnd);
-            const distance = Math.abs((a.horizontal ? a.start.y : a.start.x) - (b.horizontal ? b.start.y : b.start.x));
-            if (overlap > 0 && distance > edgeSpacing) score += overlap * (distance - edgeSpacing);
-        }
-    }
-    return score;
 }
 
 /** Separates close or shared route segments from every routing group when a clear lane exists. */
@@ -412,10 +456,10 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
     }
     clearContainerBorders(paths, borders, obstacles, config);
     straightenRoutes(nodes, paths, config, index);
+    const segmentsIndex = new SegmentIndex(paths, config.edgeSpacing);
     const maxAdjustments = Math.max(paths.length * 8, 1);
     for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
-        const baseline = conflictScore(paths, config.edgeSpacing);
-        if (!baseline) break;
+        if (!segmentsIndex.conflict) break;
         let adjusted = false;
         const segments = routeSegments(paths);
         for (let first = 0; first < segments.length && !adjusted; first += 1) {
@@ -435,13 +479,13 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                             if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
                             if (candidate !== endpoint && candidate.length > simplifyWaypoints(segment.path.points).length
                                 && sharedLength(segment.path.points, paths, segment.path) === 0) continue;
-                            const original = segment.path.points;
-                            segment.path.points = candidate;
-                            if (conflictScore(paths, config.edgeSpacing) < baseline) {
+                            // Ignore sub-pixel floating-point score ties instead of adding microscopic jogs.
+                            if (segmentsIndex.score(segment.path, candidate, "conflict") < segmentsIndex.score(segment.path, segment.path.points, "conflict") - 1e-7) {
+                                segment.path.points = candidate;
+                                segmentsIndex.replace(segment.path);
                                 adjusted = true;
                                 break;
                             }
-                            segment.path.points = original;
                         }
                         if (adjusted) break;
                     }
@@ -453,8 +497,7 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
     }
     // ponytail: equalize movable interior runs only; a full bundled-path solver would be needed to normalize endpoint and junction gaps.
     for (let adjustment = 0; adjustment < maxAdjustments; adjustment += 1) {
-        const baseline = excessSpacingScore(paths, config.edgeSpacing);
-        if (!baseline) break;
+        if (!segmentsIndex.excess) break;
         let adjusted = false;
         const segments = routeSegments(paths);
         for (let first = 0; first < segments.length && !adjusted; first += 1) {
@@ -474,13 +517,14 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
                     const candidate = nudgePath(segment, offset, config.edgeEndpointClearance);
                     if (!candidate || !pathAvoidsObstacles(candidate, obstacles.get(segment.path.edge.id) ?? [])) continue;
                     if (boundaryConflicts({ ...segment.path, points: candidate }, borders, config.edgeEndpointClearance).length) continue;
-                    const original = segment.path.points;
-                    segment.path.points = candidate;
-                    if (conflictScore(paths, config.edgeSpacing) === 0 && excessSpacingScore(paths, config.edgeSpacing) < baseline) {
+                    if (segmentsIndex.conflict === 0
+                        && segmentsIndex.score(segment.path, candidate, "conflict") === 0
+                        && segmentsIndex.score(segment.path, candidate, "excess") < segmentsIndex.score(segment.path, segment.path.points, "excess") - 1e-7) {
+                        segment.path.points = candidate;
+                        segmentsIndex.replace(segment.path);
                         adjusted = true;
                         break;
                     }
-                    segment.path.points = original;
                 }
                 if (adjusted) break;
             }

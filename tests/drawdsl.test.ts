@@ -508,6 +508,23 @@ test("global edge spacing normalizes clear parallel runs to the configured pitch
     assert.equal(Math.abs(firstLane - secondLane), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
 });
 
+test("local spacing adjustments preserve unrelated distant routes", () => {
+    const edges = Array.from({ length: 52 }, (_, declarationOrder) => ({
+        id: `route${declarationOrder}`, source: `source${declarationOrder}`, target: `target${declarationOrder}`,
+        operator: "-->" as const, declarationOrder,
+    }));
+    const routes = new Map(edges.map((edge, index) => [edge.id, {
+        sourcePoint: { x: index < 2 ? index * 20 : index * 500, y: index < 2 ? 0 : index * 500 },
+        bendPoints: index < 2 ? [{ x: index * 20, y: index ? 90 : 50 }, { x: 200 - index * 20, y: index ? 90 : 50 }] : [],
+        targetPoint: { x: index < 2 ? 200 - index * 20 : index * 500 + 200, y: index < 2 ? 100 : index * 500 },
+    }]));
+    const distant = structuredClone(routes.get("route51"));
+    enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
+    assert.deepEqual(routes.get("route51"), distant);
+    const lanes = ["route0", "route1"].map((id) => routes.get(id)!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y);
+    assert.equal(Math.abs(lanes[0]! - lanes[1]!), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+});
+
 test("global edge spacing preserves a clear straight route", () => {
     const edges = [
         { id: "bent", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
