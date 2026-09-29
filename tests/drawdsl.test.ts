@@ -11,6 +11,7 @@ import { DEFAULT_LAYOUT_CONFIG } from "../src/config.js";
 import { compileDrawDsl } from "../src/compiler.js";
 import { DRAWIO_RESOURCES } from "../src/generated/drawio-resources.js";
 import { getResourceShape, normalizeResources } from "../scripts/normalize-drawio-resources.js";
+import { routeFastEdges } from "../src/layout/routing-fast.js";
 
 test("requires namespaces and resolves aliases", () => {
     const ast = parseDsl('aws:apigw gateway "Gateway"\ncore:text note "Hello"\n gateway --> note');
@@ -35,6 +36,27 @@ test("fast routing keeps orthogonal edge geometry", async () => {
     for (const edge of layout.edges) {
         const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
         assert.ok(points.every((point, index) => index === 0 || point.x === points[index - 1]!.x || point.y === points[index - 1]!.y));
+    }
+});
+
+test("grid A* routing detours around inflated obstacles", () => {
+    const icon = resolveSymbol({ namespace: "aws", name: "lambda" });
+    const node = (id: string, x: number, y: number, declarationOrder: number) => ({
+        id, symbol: icon.ref, definition: icon.definition, label: id, x, y, width: 60, height: 60, declarationOrder,
+    });
+    const nodes = [node("source", 0, 0, 0), node("target", 300, 0, 1), node("blocker", 120, -20, 2)];
+    const edge = { id: "route", source: "source", target: "target", operator: "-->" as const, declarationOrder: 0 };
+    const result = routeFastEdges([{ edges: [edge], obstacles: nodes.map(({ x, y, width, height }) => ({ x, y, width, height })) }], nodes, DEFAULT_LAYOUT_CONFIG).get(edge.id)!;
+    const points = [result.sourcePoint, ...result.bendPoints, result.targetPoint];
+    assert.ok(points.every((point, index) => index === 0 || point.x === points[index - 1]!.x || point.y === points[index - 1]!.y));
+    for (let index = 1; index < points.length; index += 1) {
+        const start = points[index - 1]!;
+        const end = points[index]!;
+        const blocker = nodes[2]!;
+        const crosses = start.x === end.x
+            ? start.x > blocker.x && start.x < blocker.x + blocker.width && Math.max(start.y, end.y) > blocker.y && Math.min(start.y, end.y) < blocker.y + blocker.height
+            : start.y > blocker.y && start.y < blocker.y + blocker.height && Math.max(start.x, end.x) > blocker.x && Math.min(start.x, end.x) < blocker.x + blocker.width;
+        assert.equal(crosses, false);
     }
 });
 
@@ -429,7 +451,7 @@ core:group directed {
     assert.ok(first.y < second.y);
 });
 
-test("Libavoid routes around unrelated visible containers", async () => {
+test("routing modes avoid unrelated visible containers", async () => {
     const ast = parseDsl(`core:layout row {
     grid-columns 3
     core:group left {
@@ -443,20 +465,22 @@ test("Libavoid routes around unrelated visible containers", async () => {
     }
 }
 source --> target`);
-    const layout = await layoutDocument(ast);
-    const blocker = layout.nodes.find((node) => node.id === "blocker")!;
-    const edge = layout.edges[0]!;
-    const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
-    const crossesInterior = (start: { x: number; y: number }, end: { x: number; y: number }): boolean => {
-        if (start.x === end.x) {
-            return start.x > blocker.x && start.x < blocker.x + blocker.width
-                && Math.max(start.y, end.y) > blocker.y && Math.min(start.y, end.y) < blocker.y + blocker.height;
+    for (const quality of ["beautiful", "fast"] as const) {
+        const layout = await layoutDocument(ast, quality);
+        const blocker = layout.nodes.find((node) => node.id === "blocker")!;
+        const edge = layout.edges[0]!;
+        const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
+        const crossesInterior = (start: { x: number; y: number }, end: { x: number; y: number }): boolean => {
+            if (start.x === end.x) {
+                return start.x > blocker.x && start.x < blocker.x + blocker.width
+                    && Math.max(start.y, end.y) > blocker.y && Math.min(start.y, end.y) < blocker.y + blocker.height;
+            }
+            return start.y > blocker.y && start.y < blocker.y + blocker.height
+                && Math.max(start.x, end.x) > blocker.x && Math.min(start.x, end.x) < blocker.x + blocker.width;
+        };
+        for (let index = 1; index < points.length; index += 1) {
+            assert.equal(crossesInterior(points[index - 1]!, points[index]!), false);
         }
-        return start.y > blocker.y && start.y < blocker.y + blocker.height
-            && Math.max(start.x, end.x) > blocker.x && Math.min(start.x, end.x) < blocker.x + blocker.width;
-    };
-    for (let index = 1; index < points.length; index += 1) {
-        assert.equal(crossesInterior(points[index - 1]!, points[index]!), false);
     }
 });
 

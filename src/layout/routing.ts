@@ -3,6 +3,7 @@ import type { ElkNode, ElkPort } from "elkjs/lib/elk-api.js";
 import type { LayoutConfig } from "../config.js";
 import { isContainer, isLayoutOnly, isRenderable, type AstEdge, type FlatLayoutNode, type Point, type RoutedEdge } from "../model.js";
 import { byDeclarationOrder, simplifyWaypoints } from "./common.js";
+import { routeFastEdges } from "./routing-fast.js";
 
 type RoutingGroup = { edges: AstEdge[]; excludedContainers: Set<string> };
 export type Route = { sourcePoint: Point; targetPoint: Point; bendPoints: Point[] };
@@ -495,8 +496,17 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
 }
 
 export async function routeDiagram(nodes: FlatLayoutNode[], edges: AstEdge[], config: LayoutConfig, quality: RoutingQuality = "beautiful"): Promise<RoutedEdge[]> {
-    const routes = await routeWithContainerObstacles(nodes, edges, config, quality);
+    const groups = routingGroups(nodes, edges);
+    // ponytail: fixed 50k node-edge crossover; re-benchmark this threshold if diagram sizes or target hardware change.
+    const useGridAStar = quality === "fast" && nodes.length * edges.length >= 50_000;
+    const routes = useGridAStar
+        ? routeFastEdges(groups.map((group) => ({ edges: group.edges, obstacles: (routingGraph(nodes, group).children ?? []).map((node) => ({ x: node.x ?? 0, y: node.y ?? 0, width: node.width ?? 0, height: node.height ?? 0 })) })), nodes, config)
+        : await routeWithContainerObstacles(nodes, edges, config, quality === "beautiful" ? "beautiful" : "fast");
     if (quality === "beautiful") enforceGlobalEdgeSpacing(nodes, edges, routes, config);
+    else if (useGridAStar && routes.size < edges.length) {
+        const missing = edges.filter((edge) => !routes.has(edge.id));
+        for (const [id, route] of await routeWithContainerObstacles(nodes, missing, config, "fast")) routes.set(id, route);
+    }
     return byDeclarationOrder(edges.map((edge): RoutedEdge => {
         const route = routes.get(edge.id);
         return route ? { ...edge, points: simplifyWaypoints(route.bendPoints), sourcePoint: route.sourcePoint, targetPoint: route.targetPoint } : { ...edge, points: [] };
