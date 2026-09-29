@@ -161,7 +161,7 @@ The ID `connections` is reserved for the implicit default layer. Layer IDs and n
 
 Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without recompiling, rerunning ELK, or rerouting edges. Nodes, waypoints, labels, zoom, and pan remain stable. Preview choices survive edits and theme changes, but do not change the source or canonical export. Use `visible=false` in the DSL when a flow should be saved or shared as initially hidden.
 
-The preview's **Beautify routes** option enables full route nudging and cleanup for polished spacing. Turn it off for faster previews on large diagrams: larger route graphs use orthogonal grid A* with obstacle avoidance and bend, crossing, and congestion penalties; smaller graphs use Libavoid with its expensive nudging disabled. Fast routes may have less even spacing. The option is on by default, and the selected quality is used for `.drawio` downloads. CLI generation keeps beautified routing by default.
+The preview's **Beautify routes** option adds route nudging and cleanup for more polished spacing. Turn it off for much faster previews on large diagrams; routes remain orthogonal but may be less evenly spaced. The option is on by default, and the selected quality is used for `.drawio` downloads. CLI generation keeps beautified routing by default.
 
 Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. The original DSL is stored on the Architecture layer as the `drawdslSource` custom property, so the source travels with the diagram as a snapshot. Open the file directly in draw.io and use its Layers panel.
 
