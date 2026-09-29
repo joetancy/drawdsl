@@ -185,11 +185,12 @@ npm run generate -- examples/flows.drawdsl flows.drawio
 
 AWS aliases are namespace-local. For example, `aws:apigw`, `aws:igw`, `aws:kinesis`, `aws:nat`, `aws:nlb`, `aws:tgw`, `aws:tgwa`, and `aws:vpce` resolve to their canonical symbols.
 
-Use `core:image` with a quoted absolute HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; add a second quoted string for its optional displayed label. URLs containing `;` are rejected because `;` delimits draw.io styles.
+Use `core:image` with a quoted absolute HTTP(S) URL. The image is embedded as an editable draw.io image cell at a default size of 160×80; add a second quoted string for its optional displayed label. Set `[sizeMultiplier=N]` to scale both dimensions by a positive integer. URLs containing `;` are rejected because `;` delimits draw.io styles.
 
 ```text
 core:image architecture_reference "https://example.com/architecture.png"
 core:image architecture_icon "https://example.com/icon.png" "Architecture icon"
+core:image large_reference "https://example.com/large.png" "Large reference" [sizeMultiplier=2]
 ```
 
 Provider definitions live in [src/symbols/aws.ts](src/symbols/aws.ts) and [src/symbols/core.ts](src/symbols/core.ts). To add another icon family, implement a `SymbolProvider` and register it in [src/symbols/registry.ts](src/symbols/registry.ts). Parsing, layout, and rendering consume the shared symbol model, so provider-specific details stay isolated.

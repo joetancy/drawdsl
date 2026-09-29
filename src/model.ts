@@ -67,6 +67,7 @@ export type AstNode = {
     definition: SymbolDefinition;
     label: string;
     displayLabel?: string;
+    sizeMultiplier?: number;
     backgroundColor?: string;
     borderStyle?: "solid" | "dashed" | "dotted";
     rounded?: boolean;
@@ -109,6 +110,7 @@ export type FlatLayoutNode = {
     definition: SymbolDefinition;
     label: string;
     displayLabel?: string;
+    sizeMultiplier?: number;
     backgroundColor?: string;
     borderStyle?: "solid" | "dashed" | "dotted";
     rounded?: boolean;

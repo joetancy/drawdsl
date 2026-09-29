@@ -125,7 +125,7 @@ The compiler generates native, editable `.drawio` XML and embeds the exact input
 - `core:group`: visible provider-neutral container.
 - `core:layout`: invisible structural container for layout.
 - `core:text`: editable text annotation.
-- `core:image`: image from an HTTP(S) URL.
+- `core:image`: image from an HTTP(S) URL; an optional `[sizeMultiplier=N]` scales its width and height by a positive integer.
 - `core:box`: generic editable resource box.
 - `core:spacer`: anonymous invisible grid slot; it is not rendered.
 

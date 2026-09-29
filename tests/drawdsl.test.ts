@@ -215,6 +215,18 @@ test("core images accept an optional visible label as a second quoted string", (
     assert.throws(() => parseDsl('core:image reference "https://example.com/reference.png" [label="Architecture reference"]'), /labels use a second quoted string/);
 });
 
+test("core:image size multiplier changes layout and exported geometry", async () => {
+    const ast = parseDsl('core:image architecture "https://example.com/architecture.png" "Architecture" [sizeMultiplier=2]');
+    assert.equal(ast.nodes[0]?.sizeMultiplier, 2);
+    const layout = await layoutDocument(ast);
+    const image = layout.nodes[0]!;
+    assert.equal(image.width, 320);
+    assert.equal(image.height, 160);
+    assert.match(renderDrawio(layout.nodes, layout.edges), /<mxGeometry x="[^"]+" y="[^"]+" width="320\.00" height="160\.00" as="geometry"\/>/);
+    assert.throws(() => parseDsl('core:image image "https://example.com/a.png" [sizeMultiplier=0]'), /image size multiplier must be an integer/);
+    assert.throws(() => parseDsl('core:image image "https://example.com/a.png" [sizeMultiplier=1.5]'), /image size multiplier must be an integer/);
+});
+
 test("anonymous spacers reserve layout space without rendering", async () => {
     const ast = parseDsl(`core:layout row {
     grid-columns 3

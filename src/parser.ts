@@ -309,8 +309,20 @@ export function parseDsl(source: string): DocumentAst {
         let backgroundColor: string | undefined;
         let borderStyle: "solid" | "dashed" | "dotted" | undefined;
         let rounded: boolean | undefined;
+        let sizeMultiplier: number | undefined;
         const rawGroupOptions = declarationMatch[6];
-        if (rawGroupOptions !== undefined && !(symbol.ref.namespace === "core" && symbol.ref.name === "image")) {
+        const isImage = symbol.ref.namespace === "core" && symbol.ref.name === "image";
+        if (rawGroupOptions !== undefined && isImage) {
+            if (/^\s*label\s*=/.test(rawGroupOptions)) throw new DslError(`Line ${lineNumber}: core:image labels use a second quoted string`, lineNumber);
+            const seen = new Set<string>();
+            for (const rawOption of rawGroupOptions.split(",")) {
+                const option = rawOption.trim().match(/^(sizeMultiplier)\s*=\s*(\S+)$/);
+                if (!option) throw new DslError(`Line ${lineNumber}: core:image only supports sizeMultiplier`, lineNumber);
+                if (seen.has(option[1]!)) throw new DslError(`Line ${lineNumber}: duplicate core:image sizeMultiplier`, lineNumber);
+                seen.add(option[1]!);
+                sizeMultiplier = layoutNumber("image size multiplier", option[2], lineNumber);
+            }
+        } else if (rawGroupOptions !== undefined) {
             if (symbol.ref.namespace !== "core" || symbol.ref.name !== "group") throw new DslError(`Line ${lineNumber}: group options are only supported on core:group`, lineNumber);
             const seen = new Set<string>();
             for (const rawOption of rawGroupOptions.split(",")) {
@@ -333,7 +345,6 @@ export function parseDsl(source: string): DocumentAst {
         }
         const label = quotedLabel !== undefined ? unescapeQuoted(quotedLabel) : explicitId ?? symbol.definition.defaultLabel ?? symbol.ref.name;
         if (symbol.ref.namespace === "core" && symbol.ref.name === "image") {
-            if (rawGroupOptions !== undefined) throw new DslError(`Line ${lineNumber}: core:image labels use a second quoted string`, lineNumber);
             if (quotedLabel === undefined) throw new DslError(`Line ${lineNumber}: core:image requires a quoted absolute HTTP(S) URL`, lineNumber);
             let url: URL;
             try {
@@ -367,6 +378,7 @@ export function parseDsl(source: string): DocumentAst {
             definition: symbol.definition,
             label,
             ...(displayLabel !== undefined ? { displayLabel } : {}),
+            ...(sizeMultiplier !== undefined ? { sizeMultiplier } : {}),
             ...(backgroundColor ? { backgroundColor } : {}),
             ...(borderStyle ? { borderStyle } : {}),
             ...(rounded !== undefined ? { rounded } : {}),
