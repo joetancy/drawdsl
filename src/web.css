@@ -219,6 +219,8 @@ main {
 .mode-label, .preview-status { color: var(--text-tertiary); font-size: 11px; line-height: 15px; }
 .preview-status { display: inline-flex; align-items: center; gap: 6px; }
 .preview-status[data-busy="true"]::before { width: 11px; height: 11px; flex: 0 0 auto; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; content: ""; }
+.beautify-routes-control { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.beautify-routes-control input { accent-color: var(--accent); }
 .mode-label.read-only { color: var(--warning); }
 .editor-actions { flex: 0 0 auto; gap: 4px; }
 .editor-actions .toolbar-button { min-height: 34px; padding: 0 9px; font-size: 12px; }

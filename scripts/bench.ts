@@ -48,7 +48,7 @@ function median(values: number[]): number {
     return sorted[Math.floor(sorted.length / 2)]!;
 }
 
-async function measure(label: string, resources: number): Promise<void> {
+async function measure(label: string, resources: number, quality: "beautiful" | "fast" = "beautiful"): Promise<void> {
     const dsl = makeDsl(resources, 42);
     const parseSamples: number[] = [];
     const placeSamples: number[] = [];
@@ -61,7 +61,7 @@ async function measure(label: string, resources: number): Promise<void> {
     for (let i = 0; i < 2; i += 1) {
         const ast = parseDsl(dsl);
         const placed = await positionWithElk(ast, ast.layout);
-        const routed = await routeDiagram(placed, ast.edges, ast.layout);
+        const routed = await routeDiagram(placed, ast.edges, ast.layout, quality);
         renderDrawio(placed, routed);
     }
     for (let i = 0; i < 5; i += 1) {
@@ -72,7 +72,7 @@ async function measure(label: string, resources: number): Promise<void> {
         const placed = await positionWithElk(ast, ast.layout);
         placeSamples.push(performance.now() - start);
         start = performance.now();
-        const routed = await routeDiagram(placed, ast.edges, ast.layout);
+        const routed = await routeDiagram(placed, ast.edges, ast.layout, quality);
         routeSamples.push(performance.now() - start);
         start = performance.now();
         renderDrawio(placed, routed);
@@ -95,3 +95,4 @@ console.log(`node=${process.version} platform=${process.platform}-${process.arch
 await measure("small ", 25);
 await measure("medium", 100);
 await measure("large ", 300);
+await measure("large fast", 300, "fast");

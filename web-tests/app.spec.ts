@@ -151,6 +151,18 @@ test("manual preview mode waits for Refresh and can be re-enabled", async ({ pag
     await expect(page.locator("#refresh-preview")).toBeHidden();
 });
 
+test("route beautification can be disabled for a faster preview", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await expect(page.locator("#beautify-routes")).toBeChecked();
+    await page.uncheck("#beautify-routes");
+    await expect(page.locator("#preview-status")).toContainText("Up to date", { timeout: 15_000 });
+    await page.check("#beautify-routes");
+    await expect(page.locator("#preview-status")).toContainText("Up to date", { timeout: 15_000 });
+});
+
 test("xml view switches and returns to dsl", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);

@@ -19,6 +19,7 @@ const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const layerPreview = new LayerPreview(preview);
 const previewStatus = document.querySelector<HTMLSpanElement>("#preview-status")!;
+const beautifyRoutes = document.querySelector<HTMLInputElement>("#beautify-routes")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
@@ -307,7 +308,7 @@ async function render(): Promise<void> {
     try {
         await routerReady;
         if (seen !== sourceRevision) return;
-        const xml = await compileDrawDsl(src);
+        const xml = await compileDrawDsl(src, beautifyRoutes.checked ? "beautiful" : "fast");
         if (seen !== sourceRevision) return;
         latestXml = xml;
         lastGoodXml = xml;
@@ -514,6 +515,14 @@ autoRefresh.addEventListener("change", () => {
     }
 });
 refreshPreview.addEventListener("click", () => { void render(); });
+beautifyRoutes.addEventListener("change", () => {
+    markSourceChanged();
+    if (autoRefresh.checked) void render();
+    else {
+        refreshPreview.disabled = false;
+        setPreviewStatus("Route option changed · refresh to update", "warning");
+    }
+});
 gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
     const label = showingXml ? "draw.io XML output (read-only)" : "DrawDSL source";

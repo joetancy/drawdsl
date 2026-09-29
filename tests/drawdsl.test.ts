@@ -28,6 +28,16 @@ test("compiler boundary produces native draw.io XML", async () => {
     assert.ok(xml.includes('drawdslSource="aws:lambda source &quot;A &amp; B&quot;&#xa;aws:sqs target&#xa;source --&gt; target"'));
 });
 
+test("fast routing keeps orthogonal edge geometry", async () => {
+    const ast = parseDsl("aws:lambda a\naws:sqs b\naws:sns c\na --> b\na --> c\nb --> c");
+    const layout = await layoutDocument(ast, "fast");
+    assert.equal(layout.edges.length, ast.edges.length);
+    for (const edge of layout.edges) {
+        const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
+        assert.ok(points.every((point, index) => index === 0 || point.x === points[index - 1]!.x || point.y === points[index - 1]!.y));
+    }
+});
+
 test("mxGraph model renderer is usable without a draw.io file wrapper", async () => {
     const ast = parseDsl("aws:lambda source\naws:sqs target\nsource --> target");
     const layout = await layoutDocument(ast);

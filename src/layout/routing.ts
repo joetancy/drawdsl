@@ -6,6 +6,7 @@ import { byDeclarationOrder, simplifyWaypoints } from "./common.js";
 
 type RoutingGroup = { edges: AstEdge[]; excludedContainers: Set<string> };
 export type Route = { sourcePoint: Point; targetPoint: Point; bendPoints: Point[] };
+export type RoutingQuality = "beautiful" | "fast";
 type RoutePath = { edge: AstEdge; route: Route; points: Point[] };
 type Rect = { x: number; y: number; width: number; height: number };
 type LineSegment = { start: Point; end: Point; horizontal: boolean };
@@ -83,16 +84,16 @@ function routingGraph(nodes: FlatLayoutNode[], group: RoutingGroup): ElkNode {
     };
 }
 
-async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEdge[], config: LayoutConfig): Promise<Map<string, Route>> {
+async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEdge[], config: LayoutConfig, quality: RoutingQuality): Promise<Map<string, Route>> {
     const routes = new Map<string, Route>();
     for (const group of routingGroups(nodes, edges)) {
         const groupRoutes = await routeEdges(routingGraph(nodes, group), {
             shapeBufferDistance: config.edgeEndpointClearance,
             idealNudgingDistance: config.edgeSpacing,
-            nudgeOrthogonalSegmentsConnectedToShapes: true,
-            nudgeOrthogonalTouchingColinearSegments: true,
-            nudgeSharedPathsWithCommonEndPoint: true,
-            performUnifyingNudgingPreprocessingStep: true,
+            nudgeOrthogonalSegmentsConnectedToShapes: quality === "beautiful",
+            nudgeOrthogonalTouchingColinearSegments: quality === "beautiful",
+            nudgeSharedPathsWithCommonEndPoint: quality === "beautiful",
+            performUnifyingNudgingPreprocessingStep: quality === "beautiful",
         });
         for (const [id, route] of groupRoutes) routes.set(id, route);
     }
@@ -493,9 +494,9 @@ export function enforceGlobalEdgeSpacing(nodes: FlatLayoutNode[], edges: AstEdge
     }
 }
 
-export async function routeDiagram(nodes: FlatLayoutNode[], edges: AstEdge[], config: LayoutConfig): Promise<RoutedEdge[]> {
-    const routes = await routeWithContainerObstacles(nodes, edges, config);
-    enforceGlobalEdgeSpacing(nodes, edges, routes, config);
+export async function routeDiagram(nodes: FlatLayoutNode[], edges: AstEdge[], config: LayoutConfig, quality: RoutingQuality = "beautiful"): Promise<RoutedEdge[]> {
+    const routes = await routeWithContainerObstacles(nodes, edges, config, quality);
+    if (quality === "beautiful") enforceGlobalEdgeSpacing(nodes, edges, routes, config);
     return byDeclarationOrder(edges.map((edge): RoutedEdge => {
         const route = routes.get(edge.id);
         return route ? { ...edge, points: simplifyWaypoints(route.bendPoints), sourcePoint: route.sourcePoint, targetPoint: route.targetPoint } : { ...edge, points: [] };
