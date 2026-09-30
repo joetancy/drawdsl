@@ -20,6 +20,8 @@ const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const layerPreview = new LayerPreview(preview);
 const previewStatus = document.querySelector<HTMLSpanElement>("#preview-status")!;
 const beautifyRoutes = document.querySelector<HTMLInputElement>("#beautify-routes")!;
+const routingDebug = document.querySelector<HTMLInputElement>("#routing-debug")!;
+const routingTime = document.querySelector<HTMLSpanElement>("#routing-time")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const saveName = document.querySelector<HTMLInputElement>("#save-name")!;
 const saveCurrent = document.querySelector<HTMLButtonElement>("#save-current")!;
@@ -308,7 +310,9 @@ async function render(): Promise<void> {
     try {
         await routerReady;
         if (seen !== sourceRevision) return;
-        const xml = await compileDrawDsl(src, beautifyRoutes.checked ? "beautiful" : "fast");
+        const xml = await compileDrawDsl(src, beautifyRoutes.checked ? "beautiful" : "fast", (milliseconds) => {
+            if (seen === sourceRevision) routingTime.textContent = `Edge routing: ${milliseconds.toFixed(1)} ms`;
+        });
         if (seen !== sourceRevision) return;
         latestXml = xml;
         lastGoodXml = xml;
@@ -523,6 +527,7 @@ beautifyRoutes.addEventListener("change", () => {
         setPreviewStatus("Route option changed · refresh to update", "warning");
     }
 });
+routingDebug.addEventListener("change", () => { routingTime.hidden = !routingDebug.checked; });
 gotoError.addEventListener("click", focusErrorLine);
 function setEditorMode(): void {
     const label = showingXml ? "draw.io XML output (read-only)" : "DrawDSL source";

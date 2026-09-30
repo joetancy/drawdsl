@@ -163,6 +163,21 @@ test("route beautification can be disabled for a faster preview", async ({ page 
     await expect(page.locator("#preview-status")).toContainText("Up to date", { timeout: 15_000 });
 });
 
+test("Help debug checkbox shows measured edge-routing time", async ({ page }) => {
+    await stubViewer(page);
+    await stubClipboard(page);
+    await page.goto("./");
+    await ready(page);
+    await openMenu(page, "help-menu");
+    await expect(page.locator("#routing-debug")).not.toBeChecked();
+    await expect(page.locator("#routing-time")).toBeHidden();
+    await page.check("#routing-debug");
+    await expect(page.locator("#routing-time")).toBeVisible();
+    await expect(page.locator("#routing-time")).toHaveText(/^Edge routing: \d+\.\d ms$/);
+    await page.uncheck("#routing-debug");
+    await expect(page.locator("#routing-time")).toBeHidden();
+});
+
 test("xml view switches and returns to dsl", async ({ page }) => {
     await stubViewer(page);
     await stubClipboard(page);

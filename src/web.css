@@ -178,6 +178,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .menu-panel button:disabled { cursor: not-allowed; opacity: .45; }
 .help-panel, .export-panel { right: 0; }
 .help-panel { min-width: 185px; }
+.help-panel label { display: flex; min-height: 36px; align-items: center; gap: 8px; padding: 0 10px; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
+.help-panel input { accent-color: var(--accent); }
 .export-panel { min-width: 210px; }
 .saved-panel { left: 0; width: min(390px, calc(100vw - 32px)); }
 .saved-panel-heading { display: grid; gap: 3px; padding: 8px 10px 11px; border-bottom: 1px solid var(--border); }
@@ -218,6 +220,7 @@ main {
 .panel-title h2 { margin: 0; font-size: 14px; font-weight: 650; line-height: 18px; letter-spacing: -.01em; }
 .mode-label, .preview-status { color: var(--text-tertiary); font-size: 11px; line-height: 15px; }
 .preview-status { display: inline-flex; align-items: center; gap: 6px; }
+.routing-time { display: block; color: var(--text-tertiary); font-size: 11px; line-height: 15px; }
 .preview-status[data-busy="true"]::before { width: 11px; height: 11px; flex: 0 0 auto; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; content: ""; }
 .beautify-routes-control { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
 .beautify-routes-control input { accent-color: var(--accent); }

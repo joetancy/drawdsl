@@ -16,7 +16,7 @@
         <div class="header-actions">
             <details id="help-menu" class="menu-disclosure">
                 <summary aria-label="Help"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M8 7.5a2.1 2.1 0 1 1 3.6 1.5c-1 .9-1.6 1.1-1.6 2.5M10 14.3h.01"/></svg><span>Help</span></summary>
-                <div class="menu-panel help-panel"><button id="guide-toggle" type="button">DSL guide</button></div>
+                <div class="menu-panel help-panel"><button id="guide-toggle" type="button">DSL guide</button><label><input id="routing-debug" type="checkbox">Show edge routing time</label></div>
             </details>
             <button id="skill-toggle" class="toolbar-button" type="button">Skill</button>
             <a id="repo-link" href="https://github.com/joetancy/drawdsl" target="_blank" rel="noreferrer">GitHub</a>
@@ -57,7 +57,7 @@
             <div class="editor-feedback"><output id="status" aria-live="polite" data-kind="info"></output><button id="goto-error" type="button" hidden>Go to error</button></div>
         </section>
         <section class="preview-pane" aria-label="Diagram preview">
-            <div class="panel-header preview-heading"><div class="panel-title"><span class="panel-icon preview-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1"/><rect x="11.5" y="11.5" width="6" height="6" rx="1"/><path d="M8.5 5.5h2a1 1 0 0 1 1 1v5"/></svg></span><div><h2>Diagram preview</h2><span id="preview-status" class="preview-status" data-busy="true" aria-busy="true" aria-live="polite">Rendering…</span></div></div><label class="beautify-routes-control" title="Extra route nudging and cleanup improves appearance but can be slower for large diagrams"><input id="beautify-routes" type="checkbox" checked>Beautify routes</label></div>
+            <div class="panel-header preview-heading"><div class="panel-title"><span class="panel-icon preview-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1"/><rect x="11.5" y="11.5" width="6" height="6" rx="1"/><path d="M8.5 5.5h2a1 1 0 0 1 1 1v5"/></svg></span><div><h2>Diagram preview</h2><span id="preview-status" class="preview-status" data-busy="true" aria-busy="true" aria-live="polite">Rendering…</span><span id="routing-time" class="routing-time" hidden></span></div></div><label class="beautify-routes-control" title="Extra route nudging and cleanup improves appearance but can be slower for large diagrams"><input id="beautify-routes" type="checkbox" checked>Beautify routes</label></div>
             <div id="preview"><div class="preview-loading"><span class="loading-spinner" aria-hidden="true"></span><span>Preparing diagram…</span></div></div>
         </section>
     </main>
