@@ -6,6 +6,6 @@ export function createCollaborationSession(roomId: string, secret: string) {
     const doc = new Y.Doc();
     const text = doc.getText("drawdsl");
     const persistence = new IndexeddbPersistence(`drawdsl:${roomId}`, doc);
-    const provider = new WebrtcProvider(roomId, doc, { password: secret });
+    const provider = new WebrtcProvider(roomId, doc, { password: secret, signaling: ["wss://signaling.yjs.dev"] });
     return { doc, text, persistence, provider, destroy: () => { provider.destroy(); void persistence.destroy(); doc.destroy(); } };
 }
