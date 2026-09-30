@@ -238,7 +238,7 @@ main {
 .editor-input .cm-focused { outline: none; }
 .editor-input .cm-cursor { border-left-color: var(--accent); border-left-width: 2px; }
 .editor-input .cm-selectionBackground { background: var(--editor-selection) !important; }
-.editor-feedback { position: relative; z-index: 1; display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 10px; padding-top: 5px; }
+.editor-feedback { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 10px; padding-top: 5px; }
 #status { display: block; min-width: 0; overflow: hidden; color: var(--text-tertiary); font-size: 12px; line-height: 17px; text-overflow: ellipsis; }
 #status[data-kind="success"] { color: var(--success); }
 #status[data-kind="warning"] { color: var(--warning); }
