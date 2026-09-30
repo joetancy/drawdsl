@@ -302,7 +302,7 @@ dialog::backdrop { background: #10152280; backdrop-filter: blur(3px); }
 @media (max-width: 390px) {
     .brand-lockup { gap: 8px; }
     .brand-lockup h1 { font-size: 15px; }
-    .document-toolbar { gap: 2px; padding-inline: 8px; }
+    .document-toolbar { gap: 2px; padding-inline: 0; }
     .saved-current-status { display: none; }
     .toolbar-divider { margin-inline: 2px; }
     .toolbar-button { gap: 5px; font-size: 12px; }
