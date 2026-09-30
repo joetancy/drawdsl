@@ -310,9 +310,8 @@ async function render(): Promise<void> {
     try {
         await routerReady;
         if (seen !== sourceRevision) return;
-        const xml = await compileDrawDsl(src, beautifyRoutes.checked ? "beautiful" : "fast", (milliseconds, diagnostics) => {
-            if (seen !== sourceRevision) return;
-            routingTime.textContent = `Edge routing: ${milliseconds.toFixed(1)} ms · ${diagnostics.sharedSegmentPairs} overlaps · ${diagnostics.spacingConflictPairs} spacing conflicts · ${diagnostics.crowdedSides} crowded sides`;
+        const xml = await compileDrawDsl(src, beautifyRoutes.checked ? "beautiful" : "fast", (milliseconds) => {
+            if (seen === sourceRevision) routingTime.textContent = `Edge routing: ${milliseconds.toFixed(1)} ms`;
         });
         if (seen !== sourceRevision) return;
         latestXml = xml;

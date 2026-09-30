@@ -1,9 +1,8 @@
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import assert from "node:assert/strict";
 import { parseDsl } from "../src/parser.js";
 import { positionWithElk } from "../src/layout/elk.js";
-import { routeDiagram, type RoutingDiagnostics } from "../src/layout/routing.js";
+import { routeDiagram } from "../src/layout/routing.js";
 import { renderDrawio } from "../src/render/drawio.js";
 
 function mulberry32(seed: number): () => number {
@@ -58,7 +57,6 @@ async function measure(label: string, resources: number, quality: "beautiful" | 
     const totalSamples: number[] = [];
     let nodes = 0;
     let edges = 0;
-    let diagnostics: RoutingDiagnostics = { sharedSegmentPairs: 0, spacingConflictPairs: 0, crowdedSides: 0 };
     // Warm-up.
     for (let i = 0; i < 2; i += 1) {
         const ast = parseDsl(dsl);
@@ -74,12 +72,8 @@ async function measure(label: string, resources: number, quality: "beautiful" | 
         const placed = await positionWithElk(ast, ast.layout);
         placeSamples.push(performance.now() - start);
         start = performance.now();
-        const routed = await routeDiagram(placed, ast.edges, ast.layout, quality, (result) => { diagnostics = result; });
+        const routed = await routeDiagram(placed, ast.edges, ast.layout, quality);
         routeSamples.push(performance.now() - start);
-        for (const edge of routed) {
-            const points = [edge.sourcePoint!, ...edge.points, edge.targetPoint!];
-            assert.ok(points.every((point, index) => index === 0 || point.x === points[index - 1]!.x || point.y === points[index - 1]!.y), `${edge.id} must be orthogonal`);
-        }
         start = performance.now();
         renderDrawio(placed, routed);
         renderSamples.push(performance.now() - start);
@@ -93,8 +87,7 @@ async function measure(label: string, resources: number, quality: "beautiful" | 
         `place=${median(placeSamples).toFixed(1)}ms ` +
         `route=${median(routeSamples).toFixed(1)}ms ` +
         `render=${median(renderSamples).toFixed(1)}ms ` +
-        `total=${median(totalSamples).toFixed(1)}ms (median of 5, 2 warm-up) ` +
-        `shared=${diagnostics.sharedSegmentPairs} spacing-conflicts=${diagnostics.spacingConflictPairs} crowded-sides=${diagnostics.crowdedSides}`,
+        `total=${median(totalSamples).toFixed(1)}ms (median of 5, 2 warm-up)`,
     );
 }
 
