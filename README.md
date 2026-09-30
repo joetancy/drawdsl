@@ -161,7 +161,7 @@ The ID `connections` is reserved for the implicit default layer. Layer IDs and n
 
 Use the preview checkboxes, **All flows**, **Architecture only**, or **Reset layers** to compare flows without recompiling, rerunning ELK, or rerouting edges. Nodes, waypoints, labels, zoom, and pan remain stable. Preview choices survive edits and theme changes, but do not change the source or canonical export. Use `visible=false` in the DSL when a flow should be saved or shared as initially hidden.
 
-The preview's **Beautify routes** option adds route nudging and cleanup for more polished spacing. Turn it off for much faster previews on large diagrams; routes remain orthogonal but may be less evenly spaced. The option is on by default, and the selected quality is used for `.drawio` downloads. CLI generation keeps beautified routing by default.
+The preview's **Beautify routes** option adds global overlap separation and direct-approach repair. Turn it off for faster previews on large diagrams; routes remain orthogonal and receive separate attachment points, but skip global cleanup and can retain shared segments. The option is on by default, and the selected quality is used for `.drawio` downloads. CLI generation keeps beautified routing by default.
 
 Exported `.drawio` files contain native root-level layers for Connections and every named flow, while nodes remain on Architecture. The original DSL is stored on the Architecture layer as the `drawdslSource` custom property, so the source travels with the diagram as a snapshot. Open the file directly in draw.io and use its Layers panel.
 
@@ -274,9 +274,11 @@ Container directions support `right`, `left`, `down`, and `up`. A local `directi
 
 ELK positions the hierarchy and the orthogonal router uses the completed geometry. Visible containers unrelated to either endpoint remain routing obstacles, while source and destination ancestor containers stay traversable so connections can enter and leave them. `core:layout` is never an obstacle. Draw.io receives the resulting bendpoints and attachment points.
 
-`edge-spacing` sets the target pitch for clear, overlapping parallel route segments. The obstacle-aware cleanup equalizes movable interior runs and separates closer lanes; fixed endpoint stubs, junctions, and obstacles can prevent uniform spacing near nodes or turns. A straight route is not bent solely to create a parallel lane. Unrelated visible container borders receive the internal 40px routing clearance; source and destination ancestors remain traversable. Perpendicular crossings are allowed and do not affect routing.
+`edge-spacing` requests minimum clearance between parallel edges; already-clear edges are never pulled together into a bundle. Connections receive distinct, geometrically ordered attachment points across container routing groups. Cleanup prefers direct, low-bend approaches, rejects self-intersections and backtracking jogs, and performs bounded rerouting of unresolved shared approaches. Node obstacle padding adapts to available corridors independently of the preferred 40px endpoint lead-in and container-border clearance. Perpendicular crossings between different edges are allowed.
 
-Explicit `T:`, `R:`, `B:`, and `L:` endpoint selectors remain available when a relationship needs a specific source or target side.
+Enable **Help → Show edge routing time** to inspect routing duration, remaining shared segment pairs, spacing conflicts, and crowded node sides. Pinned sides or tight obstacles can prevent full separation; crowded sides retain distinct attachments with smaller gaps rather than merging them. Geometry that still cannot be routed orthogonally after bounded retries produces a compilation error.
+
+Explicit `T:`, `R:`, `B:`, and `L:` endpoint selectors remain available when a relationship needs a specific source or target side. They fix the side, not a common midpoint: multiple connections are distributed along that side.
 
 ```text
 direction right   # right, left, down, or up

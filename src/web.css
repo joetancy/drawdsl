@@ -228,7 +228,7 @@ main {
 .editor-actions { flex: 0 0 auto; gap: 4px; }
 .editor-actions .toolbar-button { min-height: 34px; padding: 0 9px; font-size: 12px; }
 .editor-actions .toolbar-button svg { width: 15px; height: 15px; }
-.auto-refresh-control { display: inline-flex; align-items: center; gap: 5px; padding: 0 5px; color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+.auto-refresh-control { display: inline-flex; align-items: center; gap: 5px; padding: 0 5px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
 .auto-refresh-control input { accent-color: var(--accent); }
 
 .editor-input { width: 100%; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
@@ -294,7 +294,7 @@ dialog::backdrop { background: #10152280; backdrop-filter: blur(3px); }
     .editor-heading { align-items: flex-start; }
     .editor-actions { gap: 2px; }
     .editor-actions .toolbar-button { min-height: 36px; padding: 0 7px; }
-    .auto-refresh-control { gap: 3px; padding-inline: 2px; font-size: 10px; }
+    .auto-refresh-control { gap: 3px; padding-inline: 2px; }
     #preview { min-height: 400px; }
 }
 

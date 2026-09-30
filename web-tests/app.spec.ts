@@ -173,7 +173,7 @@ test("Help debug checkbox shows measured edge-routing time", async ({ page }) =>
     await expect(page.locator("#routing-time")).toBeHidden();
     await page.check("#routing-debug");
     await expect(page.locator("#routing-time")).toBeVisible();
-    await expect(page.locator("#routing-time")).toHaveText(/^Edge routing: \d+\.\d ms$/);
+    await expect(page.locator("#routing-time")).toHaveText(/^Edge routing: \d+\.\d ms · \d+ overlaps · \d+ spacing conflicts · \d+ crowded sides$/);
     await page.uncheck("#routing-debug");
     await expect(page.locator("#routing-time")).toBeHidden();
 });
@@ -303,6 +303,8 @@ test("narrow viewport keeps essential controls reachable", async ({ page }) => {
     await stubClipboard(page);
     await page.goto("./");
     await ready(page);
+    const controlFonts = await page.evaluate(() => [".auto-refresh-control", ".beautify-routes-control"].map((selector) => getComputedStyle(document.querySelector(selector)!).fontSize));
+    expect(controlFonts).toEqual(["12px", "12px"]);
     await openMenu(page, "export-menu");
     await openMenu(page, "saved-menu");
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);

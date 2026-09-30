@@ -37,7 +37,8 @@ export function simplifyWaypoints(points: Point[]): Point[] {
             const before = simplified.at(-3)!;
             const middle = simplified.at(-2)!;
             const after = simplified.at(-1)!;
-            if (!((before.x === middle.x && middle.x === after.x) || (before.y === middle.y && middle.y === after.y))) break;
+            if (!((before.x === middle.x && middle.x === after.x) || (before.y === middle.y && middle.y === after.y))
+                || (middle.x - before.x) * (after.x - middle.x) + (middle.y - before.y) * (after.y - middle.y) < 0) break;
             simplified.splice(-2, 1);
         }
     }

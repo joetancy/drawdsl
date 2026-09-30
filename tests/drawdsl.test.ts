@@ -511,7 +511,7 @@ test("global edge spacing separates genuinely overlapping route segments", () =>
     assert.notEqual(routes.get("first")!.bendPoints[0]!.y, routes.get("second")!.bendPoints[0]!.y);
 });
 
-test("global edge spacing normalizes clear parallel runs to the configured pitch", () => {
+test("global edge spacing leaves already-clear parallel runs independent", () => {
     const edges = [
         { id: "first", source: "source_a", target: "target_a", operator: "-->" as const, declarationOrder: 0 },
         { id: "second", source: "source_b", target: "target_b", operator: "-->" as const, declarationOrder: 1 },
@@ -525,7 +525,7 @@ test("global edge spacing normalizes clear parallel runs to the configured pitch
 
     const firstLane = routes.get("first")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
     const secondLane = routes.get("second")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
-    assert.equal(Math.abs(firstLane - secondLane), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+    assert.equal(Math.abs(firstLane - secondLane), 40);
 });
 
 test("spacing finds long shared runs and neighboring lanes across negative bucket boundaries", () => {
@@ -568,7 +568,7 @@ test("local spacing adjustments preserve unrelated distant routes", () => {
     enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
     assert.deepEqual(routes.get("route51"), distant);
     const lanes = ["route0", "route1"].map((id) => routes.get(id)!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y);
-    assert.equal(Math.abs(lanes[0]! - lanes[1]!), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+    assert.equal(Math.abs(lanes[0]! - lanes[1]!), 40);
 });
 
 test("global edge spacing preserves a clear straight route", () => {
@@ -744,8 +744,8 @@ test("border cleanup uses narrow lanes and ignores unchanged shared segments", (
         [other.id, { sourcePoint: { x: 300, y: 220 }, bendPoints: [], targetPoint: { x: 300, y: 180 } }],
     ]);
     // An obstacle blocks the outer lane, leaving the 40-unit gap between borders.
-    const blocker = { ...source, id: "blocker", parentId: undefined, x: 100, y: -20, width: 100, height: 80 };
-    const innerBlocker = { ...blocker, id: "innerBlocker", y: 180 };
+    const blocker = { ...source, id: "blocker", parentId: undefined, x: 100, y: -20, width: 100, height: 120 };
+    const innerBlocker = { ...blocker, id: "innerBlocker", y: 160 };
     enforceGlobalEdgeSpacing([{ ...nodes[0]!, height: 400 }, { ...nodes[1]!, parentId: "group0" }, source, blocker, innerBlocker], [edge, other], routes, DEFAULT_LAYOUT_CONFIG);
     assert.deepEqual(routes.get(edge.id)!.bendPoints, [{ x: 300, y: 120 }, { x: 0, y: 120 }]);
 });
