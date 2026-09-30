@@ -155,7 +155,6 @@ let loadedDiagramName: string | undefined;
 let savedSnapshot = "";
 let savedFailed = false;
 let collaboration: ReturnType<typeof createCollaborationSession> | undefined;
-let peerCount = 0;
 let initialized = false;
 
 function updateSourceFromEditor(): void {
@@ -306,8 +305,10 @@ function renderSavedDiagrams(): void {
 }
 
 async function syncShareUrl(snapshot: string, expectedRevision?: number): Promise<void> {
+    if (collaboration) return;
     const hash = await buildShareHash(snapshot);
     if (expectedRevision !== undefined && expectedRevision !== shareRevision) return;
+    if (collaboration) return;
     history.replaceState(null, "", `#${hash}`);
 }
 
@@ -427,13 +428,14 @@ async function joinCollaboration(roomId: string, secret: string, initialContent?
         void render();
     }
     view.dispatch({ effects: collaborationCompartment.reconfigure(yCollab(session.text, session.provider.awareness)) });
-    session.provider.on("status", ({ connected }) => {
-        if (collaboration === session) collaborationStatus.textContent = connected ? `${peerCount} peers · connected` : "Reconnecting…";
-    });
-    session.provider.on("peers", ({ webrtcPeers }) => {
-        peerCount = webrtcPeers.length + 1;
-        if (collaboration === session) collaborationStatus.textContent = `${peerCount} ${peerCount === 1 ? "peer" : "peers"} · ${session.provider.connected ? "connected" : "connecting"}`;
-    });
+    const updateParticipants = () => {
+        if (collaboration !== session) return;
+        const participants = session.provider.awareness.getStates().size;
+        collaborationStatus.textContent = participants > 1 ? `${participants} participants · connected` : "Waiting for another participant · open the invitation link in another browser or tab";
+    };
+    session.provider.awareness.on("change", updateParticipants);
+    session.provider.on("status", updateParticipants);
+    updateParticipants();
     collaborationDialog.showModal();
 }
 
@@ -460,12 +462,12 @@ collaborationCopy.addEventListener("click", async () => {
 collaborationLeave.addEventListener("click", () => {
     collaboration?.destroy();
     collaboration = undefined;
-    peerCount = 0;
     view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
     history.replaceState(null, "", location.pathname);
     setButtonLabel(collaborateButton, "Collaborate");
     collaborationDialog.close();
 });
+document.querySelector<HTMLButtonElement>("#collaboration-close")!.addEventListener("click", () => collaborationDialog.close());
 savedReset.addEventListener("click", () => {
     if (!savedFailed) return;
     if (!confirm("Saved data looks corrupt. Clear it and start fresh? This cannot be undone.")) return;
