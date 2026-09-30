@@ -13,8 +13,15 @@ import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { editorExtensions } from "./editor.js";
 import { LayerPreview } from "./layer-preview.js";
+import type { createCollaborationSession } from "./collaboration/collaboration.js";
 
 const source = document.querySelector<HTMLDivElement>("#source")!;
+const collaborateButton = document.querySelector<HTMLButtonElement>("#collaborate")!;
+const collaborationDialog = document.querySelector<HTMLDialogElement>("#collaboration")!;
+const collaborationStatus = document.querySelector<HTMLParagraphElement>("#collaboration-status")!;
+const collaborationLink = document.querySelector<HTMLInputElement>("#collaboration-link")!;
+const collaborationCopy = document.querySelector<HTMLButtonElement>("#collaboration-copy")!;
+const collaborationLeave = document.querySelector<HTMLButtonElement>("#collaboration-leave")!;
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const layerPreview = new LayerPreview(preview);
@@ -57,7 +64,8 @@ const gotoError = document.querySelector<HTMLButtonElement>("#goto-error")!;
 const savedMenu = document.querySelector<HTMLDetailsElement>("#saved-menu")!;
 let errorLine: number | undefined;
 const modeCompartment = new Compartment();
-const view = new EditorView({ parent: source, doc: "", extensions: [modeCompartment.of(editorExtensions())] });
+const collaborationCompartment = new Compartment();
+const view = new EditorView({ parent: source, doc: "", extensions: [modeCompartment.of(editorExtensions()), collaborationCompartment.of([]), EditorView.updateListener.of((update) => { if (update.docChanged) updateSourceFromEditor(); })] });
 const editorText = (): string => view.state.doc.toString();
 
 function setErrorLine(line?: number): void {
@@ -146,6 +154,29 @@ let loadedDiagramId: string | undefined;
 let loadedDiagramName: string | undefined;
 let savedSnapshot = "";
 let savedFailed = false;
+let collaboration: ReturnType<typeof createCollaborationSession> | undefined;
+let peerCount = 0;
+let initialized = false;
+
+function updateSourceFromEditor(): void {
+    if (!initialized || showingXml) return;
+    editorFull = editorText();
+    foldRegions = computeFoldRegions(editorFull);
+    dslSource = editorFull;
+    refreshLoadedStatus();
+    setPreviewStatus("Changes pending…");
+    markSourceChanged();
+    scheduleShareUrl();
+    updateEditor();
+    if (autoRefresh.checked) {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => void render(), 120);
+    } else {
+        refreshPreview.disabled = false;
+        setPreviewStatus("Changes pending · automatic refresh is off", "warning");
+    }
+}
+
 
 type SavedDiagram = { id: string; name: string; source: string };
 
@@ -365,7 +396,9 @@ function showPreviewFallback(titleText: string, messageText: string): void {
     preview.replaceChildren(fallback);
 }
 
-const initialHash = location.hash.slice(1);
+const initialHashParams = new URLSearchParams(location.hash.slice(1));
+initialHashParams.delete("key");
+const initialHash = initialHashParams.toString();
 const initialLegacy = new URLSearchParams(initialHash).get("dsl");
 setEditorText(initialLegacy ?? starter);
 dslSource = editorFull;
@@ -374,6 +407,65 @@ skillSource.textContent = skillText;
 setEditorMode();
 updateEditor();
 renderSavedDiagrams();
+initialized = true;
+
+async function joinCollaboration(roomId: string, secret: string, initialContent?: string): Promise<void> {
+    collaboration?.destroy();
+    const [{ createCollaborationSession }, { yCollab }] = await Promise.all([import("./collaboration/collaboration.js"), import("y-codemirror.next")]);
+    const session = createCollaborationSession(roomId, secret);
+    collaboration = session;
+    collaborationStatus.textContent = "Connecting…";
+    collaborationLink.value = location.href;
+    setButtonLabel(collaborateButton, "Collaborating");
+    await session.persistence.whenSynced;
+    if (collaboration !== session) return;
+    if (!session.text.length && initialContent) session.text.insert(0, initialContent);
+    if (session.text.toString() !== editorText()) {
+        dslSource = session.text.toString();
+        setEditorText(dslSource);
+        markSourceChanged();
+        void render();
+    }
+    view.dispatch({ effects: collaborationCompartment.reconfigure(yCollab(session.text, session.provider.awareness)) });
+    session.provider.on("status", ({ connected }) => {
+        if (collaboration === session) collaborationStatus.textContent = connected ? `${peerCount} peers · connected` : "Reconnecting…";
+    });
+    session.provider.on("peers", ({ webrtcPeers }) => {
+        peerCount = webrtcPeers.length + 1;
+        if (collaboration === session) collaborationStatus.textContent = `${peerCount} ${peerCount === 1 ? "peer" : "peers"} · ${session.provider.connected ? "connected" : "connecting"}`;
+    });
+    collaborationDialog.showModal();
+}
+
+const roomId = new URLSearchParams(location.search).get("room");
+const roomSecret = new URLSearchParams(location.hash.slice(1)).get("key");
+if (roomId && roomSecret) void joinCollaboration(roomId, roomSecret);
+
+collaborateButton.addEventListener("click", () => {
+    if (collaboration) { collaborationDialog.showModal(); return; }
+    const room = crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const secret = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    history.replaceState(null, "", `?room=${encodeURIComponent(room)}#key=${secret}`);
+    void joinCollaboration(room, secret, currentSource());
+});
+collaborationCopy.addEventListener("click", async () => {
+    try {
+        await navigator.clipboard.writeText(collaborationLink.value);
+        collaborationCopy.textContent = "Copied";
+    } catch {
+        collaborationStatus.textContent = "Clipboard access was denied";
+    }
+});
+collaborationLeave.addEventListener("click", () => {
+    collaboration?.destroy();
+    collaboration = undefined;
+    peerCount = 0;
+    view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
+    history.replaceState(null, "", location.pathname);
+    setButtonLabel(collaborateButton, "Collaborate");
+    collaborationDialog.close();
+});
 savedReset.addEventListener("click", () => {
     if (!savedFailed) return;
     if (!confirm("Saved data looks corrupt. Clear it and start fresh? This cannot be undone.")) return;
@@ -609,24 +701,6 @@ themeToggle.addEventListener("click", () => {
     if (lastGoodXml) layerPreview.redraw(darkMode);
 });
 view.dom.addEventListener("click", () => updateEditor());
-view.dom.addEventListener("input", () => {
-    if (showingXml) return;
-    editorFull = editorText();
-    foldRegions = computeFoldRegions(editorFull);
-    dslSource = editorFull;
-    refreshLoadedStatus();
-    setPreviewStatus("Changes pending…");
-    markSourceChanged();
-    scheduleShareUrl();
-    updateEditor();
-    if (autoRefresh.checked) {
-        clearTimeout(debounce);
-        debounce = setTimeout(() => void render(), 120);
-    } else {
-        refreshPreview.disabled = false;
-        setPreviewStatus("Changes pending · automatic refresh is off", "warning");
-    }
-});
 foldToggle.addEventListener("click", () => {
     if (showingXml || !foldRegions.length) return;
     if (view.dom.querySelector(".cm-foldPlaceholder")) unfoldAll(view);
