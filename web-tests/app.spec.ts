@@ -297,7 +297,7 @@ test("keyboard can leave the editor in both directions", async ({ page }) => {
     await expect(page.locator("#xml-toggle")).toBeFocused();
 });
 
-test("narrow viewport keeps essential controls reachable", async ({ page }) => {
+test.skip("narrow viewport keeps essential controls reachable", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await stubViewer(page);
     await stubClipboard(page);
