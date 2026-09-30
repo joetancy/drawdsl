@@ -221,12 +221,8 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
             })) };
             const retry = await routeEdges(retryGraph, retryOptions);
             for (const edge of failed) {
-                let route = retry.get(edge.id);
-                if (invalid(edge, route)) {
-                    // Last resort: preserve obstacle checking but remove padding that may close a tight corridor.
-                    route = (await routeEdges(retryGraph, { ...retryOptions, shapeBufferDistance: 0 })).get(edge.id);
-                }
-                if (invalid(edge, route)) throw new Error(`Could not route edge ${edge.source} → ${edge.target}${edge.line === undefined ? "" : ` (line ${edge.line})`}; free space around its endpoints or change its pinned sides`);
+                const route = retry.get(edge.id);
+                if (invalid(edge, route)) throw new Error(`Could not route edge ${edge.source} → ${edge.target}; free space around its endpoints or change its pinned sides`);
                 if (route) groupRoutes.set(edge.id, route);
             }
         }
