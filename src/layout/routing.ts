@@ -200,7 +200,14 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
         let failed = group.edges.filter((edge) => invalid(edge, groupRoutes.get(edge.id)));
         if (failed.length) {
             // Endpoint lead-in length is not obstacle padding: 40px buffers close an 80px grid gap.
-            const retryOptions = { ...options, shapeBufferDistance: Math.min(config.edgeEndpointClearance, config.edgeSpacing / 2) };
+            const retryOptions = {
+                ...options,
+                shapeBufferDistance: Math.min(config.edgeEndpointClearance, config.edgeSpacing / 2),
+                nudgeOrthogonalSegmentsConnectedToShapes: false,
+                nudgeOrthogonalTouchingColinearSegments: false,
+                nudgeSharedPathsWithCommonEndPoint: false,
+                performUnifyingNudgingPreprocessingStep: false,
+            };
             const compact = await routeEdges({ ...graph, edges: graph.edges?.filter((edge) => failed.some((item) => item.id === edge.id)) }, retryOptions);
             for (const edge of failed) {
                 const route = compact.get(edge.id);
