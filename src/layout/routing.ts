@@ -5,7 +5,7 @@ import { isContainer, isLayoutOnly, isRenderable, type AstEdge, type FlatLayoutN
 import { byDeclarationOrder, simplifyWaypoints } from "./common.js";
 
 type RoutingGroup = { edges: AstEdge[]; excludedContainers: Set<string> };
-export type Route = { sourcePoint: Point; targetPoint: Point; bendPoints: Point[] };
+export type Route = { sourcePoint: Point; targetPoint: Point; bendPoints: Point[]; sourceSide?: "north" | "south" | "east" | "west"; targetSide?: "north" | "south" | "east" | "west" };
 export type RoutingQuality = "beautiful" | "fast";
 type RoutePath = { edge: AstEdge; route: Route; points: Point[] };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -41,6 +41,129 @@ function routingBuffer(graph: ElkNode, config: LayoutConfig): number {
         if (gap !== undefined) buffer = Math.min(buffer, Math.max(config.edgeSpacing / 2, (gap - config.edgeSpacing * 2) / 2));
     }
     return buffer;
+}
+
+function orthogonalFallback(node: FlatLayoutNode, target: FlatLayoutNode, point: Point, other: Point, fixedSide?: Side): Array<{ side: Side; point: Point }> {
+    const sides: Side[] = fixedSide ? [fixedSide] : ["left", "right", "top", "bottom"];
+    const result: Array<{ side: Side; point: Point }> = [];
+    for (const side of sides) {
+        const length = side === "left" || side === "right" ? node.height : node.width;
+        const original = side === "left" || side === "right" ? point.y - node.y : point.x - node.x;
+        const preferred = side === "left" || side === "right" ? other.y - node.y : other.x - node.x;
+        const offsets = fixedSide ? [original] : [preferred, original, length * 0.2, length * 0.4, length * 0.6, length * 0.8];
+        for (const offset of [...new Set(offsets.map((value) => Math.max(1, Math.min(length - 1, value))))]) {
+            result.push({ side, point: sidePoint(node, side, offset) });
+        }
+    }
+    return result.sort((a, b) => {
+        const cost = (entry: { side: Side; point: Point }): number => Math.abs(entry.point.x - other.x) + Math.abs(entry.point.y - other.y)
+            + ((entry.side === "left" && other.x > node.x + node.width / 2) || (entry.side === "right" && other.x < node.x + node.width / 2)
+                || (entry.side === "top" && other.y > node.y + node.height / 2) || (entry.side === "bottom" && other.y < node.y + node.height / 2) ? 1000 : 0);
+        return cost(a) - cost(b);
+    }).slice(0, 6);
+}
+
+/** Visibility-graph fallback for the rare edge Libavoid cannot orthogonally route after nudging is disabled. */
+function visibilityRoute(start: Point, startSide: Side, end: Point, endSide: Side, obstacles: Rect[], config: LayoutConfig): Point[] | undefined {
+    const lead = Math.min(config.edgeEndpointClearance, Math.max(config.edgeSpacing, 16));
+    const outward = (point: Point, side: Side): Point => ({
+        x: point.x + (side === "left" ? -lead : side === "right" ? lead : 0),
+        y: point.y + (side === "top" ? -lead : side === "bottom" ? lead : 0),
+    });
+    const from = outward(start, startSide);
+    const to = outward(end, endSide);
+    if (!pathAvoidsObstacles([start, from], obstacles) || !pathAvoidsObstacles([to, end], obstacles)) return undefined;
+    const vertices = new Map<string, Point>();
+    const add = (point: Point): void => { vertices.set(`${point.x},${point.y}`, point); };
+    add(from);
+    add(to);
+    for (const obstacle of obstacles) {
+        add({ x: obstacle.x - 1, y: obstacle.y - 1 });
+        add({ x: obstacle.x - 1, y: obstacle.y + obstacle.height + 1 });
+        add({ x: obstacle.x + obstacle.width + 1, y: obstacle.y - 1 });
+        add({ x: obstacle.x + obstacle.width + 1, y: obstacle.y + obstacle.height + 1 });
+    }
+    const points = [...vertices.values()];
+    const adjacency = points.map((): number[] => []);
+    for (const axis of ["x", "y"] as const) {
+        const groups = new Map<number, number[]>();
+        points.forEach((point, index) => {
+            const key = point[axis];
+            const group = groups.get(key) ?? [];
+            group.push(index);
+            groups.set(key, group);
+        });
+        for (const [coordinate, group] of groups) {
+            group.sort((a, b) => points[a]![axis === "x" ? "y" : "x"] - points[b]![axis === "x" ? "y" : "x"]);
+            for (let i = 1; i < group.length; i += 1) {
+                const a = group[i - 1]!;
+                const b = group[i]!;
+                if (!pathAvoidsObstacles([points[a]!, points[b]!], obstacles)) continue;
+                adjacency[a]!.push(b);
+                adjacency[b]!.push(a);
+            }
+            void coordinate;
+        }
+    }
+    const startIndex = points.findIndex((point) => point.x === from.x && point.y === from.y);
+    const endIndex = points.findIndex((point) => point.x === to.x && point.y === to.y);
+    const key = (vertex: number, direction: number): string => `${vertex}:${direction}`;
+    const costs = new Map<string, number>([[key(startIndex, 0), 0]]);
+    const previous = new Map<string, string>();
+    const open = [key(startIndex, 0)];
+    let finish: string | undefined;
+    while (open.length) {
+        let best = 0;
+        for (let i = 1; i < open.length; i += 1) if (costs.get(open[i]!)! < costs.get(open[best]!)!) best = i;
+        const current = open.splice(best, 1)[0]!;
+        const [vertex, direction] = current.split(":").map(Number) as [number, number];
+        if (vertex === endIndex) { finish = current; break; }
+        for (const next of adjacency[vertex]!) {
+            const a = points[vertex]!;
+            const b = points[next]!;
+            const nextDirection = a.x === b.x ? 2 : 1;
+            const candidate = costs.get(current)! + Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + (direction && direction !== nextDirection ? config.edgeSpacing : 0);
+            const nextKey = key(next, nextDirection);
+            if (candidate >= (costs.get(nextKey) ?? Infinity)) continue;
+            costs.set(nextKey, candidate);
+            previous.set(nextKey, current);
+            if (!open.includes(nextKey)) open.push(nextKey);
+        }
+    }
+    if (!finish) return undefined;
+    const path: Point[] = [];
+    for (let current: string | undefined = finish; current; current = previous.get(current)) path.push(points[Number(current.split(":")[0])]!);
+    path.reverse();
+    const result = simplifyWaypoints([start, ...path, end]);
+    return pathAvoidsObstacles(result, obstacles) ? result : undefined;
+}
+
+function fallbackRoute(edge: AstEdge, route: Route | undefined, nodes: Map<string, FlatLayoutNode>, graph: ElkNode, ports: Map<string, ElkPort[]>, config: LayoutConfig): Route | undefined {
+    const source = nodes.get(edge.source);
+    const target = nodes.get(edge.target);
+    if (!source || !target || edge.source === edge.target) return undefined;
+    const endpoint = (node: FlatLayoutNode, isSource: boolean): Point => {
+        const port = ports.get(node.id)?.find((item) => item.id === portId(edge.id, isSource));
+        return port ? { x: node.x + (port.x ?? 0), y: node.y + (port.y ?? 0) }
+            : isSource ? route?.sourcePoint ?? { x: node.x + node.width / 2, y: node.y + node.height / 2 }
+                : route?.targetPoint ?? { x: node.x + node.width / 2, y: node.y + node.height / 2 };
+    };
+    const sourceOriginal = endpoint(source, true);
+    const targetOriginal = endpoint(target, false);
+    const obstacles = (graph.children ?? []).filter((node) => node.id !== source.id && node.id !== target.id)
+        .map((node) => ({ x: node.x!, y: node.y!, width: node.width!, height: node.height! }));
+    const sources = orthogonalFallback(source, target, sourceOriginal, targetOriginal, edge.sourceSide);
+    const targets = orthogonalFallback(target, source, targetOriginal, sourceOriginal, edge.targetSide);
+    for (const from of sources) for (const to of targets) {
+        const points = visibilityRoute(from.point, from.side, to.point, to.side, obstacles, config);
+        if (!points) continue;
+        const adjacentSource = points[1]!;
+        const adjacentTarget = points.at(-2)!;
+        if (!validAttachment(from.point, adjacentSource, from.point, source, !!edge.sourceSide)
+            || !validAttachment(to.point, adjacentTarget, to.point, target, !!edge.targetSide)) continue;
+        return { sourcePoint: from.point, targetPoint: to.point, bendPoints: points.slice(1, -1) };
+    }
+    return undefined;
 }
 
 /** Allocate across every routing group: a side selector fixes the side, not a shared midpoint. */
@@ -186,7 +309,7 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
             nudgeSharedPathsWithCommonEndPoint: quality === "beautiful",
             performUnifyingNudgingPreprocessingStep: false,
         };
-        const groupRoutes = await routeEdges(graph, options);
+        const groupRoutes = new Map<string, Route>(await routeEdges(graph, options));
         const invalid = (edge: AstEdge, route: Route | undefined): boolean => {
             if (!route) return edge.source !== edge.target;
             const points = [route.sourcePoint, ...route.bendPoints, route.targetPoint];
@@ -228,11 +351,12 @@ async function routeWithContainerObstacles(nodes: FlatLayoutNode[], edges: AstEd
             })) };
             const retry = await routeEdges(retryGraph, retryOptions);
             for (const edge of failed) {
-                let route = retry.get(edge.id);
+                let route: Route | undefined = retry.get(edge.id);
                 if (invalid(edge, route)) {
                     // Last resort: preserve obstacle checking but remove padding that may close a tight corridor.
                     route = (await routeEdges(retryGraph, { ...retryOptions, shapeBufferDistance: 0 })).get(edge.id);
                 }
+                if (invalid(edge, route)) route = fallbackRoute(edge, route, byId, graph, ports, config);
                 if (invalid(edge, route)) throw new Error(`Could not route edge ${edge.source} → ${edge.target}${edge.line === undefined ? "" : ` (line ${edge.line})`}; free space around its endpoints or change its pinned sides`);
                 if (route) groupRoutes.set(edge.id, route);
             }
