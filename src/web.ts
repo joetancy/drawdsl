@@ -14,7 +14,6 @@ import { EditorView } from "@codemirror/view";
 import { editorExtensions } from "./editor.js";
 import { LayerPreview } from "./layer-preview.js";
 import type { createCollaborationSession } from "./collaboration/collaboration.js";
-import { readPairingLink } from "./collaboration/pairing.js";
 
 const source = document.querySelector<HTMLDivElement>("#source")!;
 const collaborateButton = document.querySelector<HTMLButtonElement>("#collaborate")!;
@@ -23,12 +22,6 @@ const collaborationStatus = document.querySelector<HTMLParagraphElement>("#colla
 const collaborationLink = document.querySelector<HTMLInputElement>("#collaboration-link")!;
 const collaborationCopy = document.querySelector<HTMLButtonElement>("#collaboration-copy")!;
 const collaborationLeave = document.querySelector<HTMLButtonElement>("#collaboration-leave")!;
-const collaborationInvite = document.querySelector<HTMLButtonElement>("#collaboration-invite")!;
-const collaborationAnswer = document.querySelector<HTMLInputElement>("#collaboration-answer")!;
-const collaborationConnect = document.querySelector<HTMLButtonElement>("#collaboration-connect")!;
-const collaborationInstructions = document.querySelector<HTMLParagraphElement>("#collaboration-instructions")!;
-const collaborationHostControls = document.querySelector<HTMLDivElement>("#collaboration-host-controls")!;
-document.querySelector<HTMLButtonElement>("#collaboration-close")!.addEventListener("click", () => collaborationDialog.close());
 const foldToggle = document.querySelector<HTMLButtonElement>("#fold-toggle")!;
 const preview = document.querySelector<HTMLDivElement>("#preview")!;
 const layerPreview = new LayerPreview(preview);
@@ -124,12 +117,6 @@ function getEditorFull(): string {
 }
 
 function setEditorText(full: string): void {
-    if (collaboration && !showingXml && collaboration.text.toString() !== full) {
-        collaboration.doc.transact(() => {
-            collaboration!.text.delete(0, collaboration!.text.length);
-            collaboration!.text.insert(0, full);
-        });
-    }
     editorFull = full;
     foldRegions = computeFoldRegions(full);
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: full }, selection: { anchor: 0 } });
@@ -168,7 +155,7 @@ let loadedDiagramName: string | undefined;
 let savedSnapshot = "";
 let savedFailed = false;
 let collaboration: ReturnType<typeof createCollaborationSession> | undefined;
-let collaborationBinding: import("@codemirror/state").Extension = [];
+let peerCount = 0;
 let initialized = false;
 
 function updateSourceFromEditor(): void {
@@ -321,7 +308,6 @@ function renderSavedDiagrams(): void {
 async function syncShareUrl(snapshot: string, expectedRevision?: number): Promise<void> {
     const hash = await buildShareHash(snapshot);
     if (expectedRevision !== undefined && expectedRevision !== shareRevision) return;
-    if (collaboration) return;
     history.replaceState(null, "", `#${hash}`);
 }
 
@@ -412,7 +398,6 @@ function showPreviewFallback(titleText: string, messageText: string): void {
 
 const initialHashParams = new URLSearchParams(location.hash.slice(1));
 initialHashParams.delete("key");
-initialHashParams.delete("pair");
 const initialHash = initialHashParams.toString();
 const initialLegacy = new URLSearchParams(initialHash).get("dsl");
 setEditorText(initialLegacy ?? starter);
@@ -424,13 +409,13 @@ updateEditor();
 renderSavedDiagrams();
 initialized = true;
 
-async function joinCollaboration(roomId: string, initialContent?: string): Promise<void> {
+async function joinCollaboration(roomId: string, secret: string, initialContent?: string): Promise<void> {
+    collaboration?.destroy();
     const [{ createCollaborationSession }, { yCollab }] = await Promise.all([import("./collaboration/collaboration.js"), import("y-codemirror.next")]);
-    const session = createCollaborationSession(roomId, (peers, error) => {
-        if (collaboration === session) collaborationStatus.textContent = error ?? (peers ? `Connected · ${peers} ${peers === 1 ? "peer" : "peers"}` : "No peers connected · exchange pairing links to connect");
-    });
+    const session = createCollaborationSession(roomId, secret);
     collaboration = session;
-    collaborationStatus.textContent = "No peers connected · exchange pairing links to connect";
+    collaborationStatus.textContent = "Connecting…";
+    collaborationLink.value = location.href;
     setButtonLabel(collaborateButton, "Collaborating");
     await session.persistence.whenSynced;
     if (collaboration !== session) return;
@@ -441,81 +426,28 @@ async function joinCollaboration(roomId: string, initialContent?: string): Promi
         markSourceChanged();
         void render();
     }
-    collaborationBinding = yCollab(session.text, null);
-    view.dispatch({ effects: collaborationCompartment.reconfigure(collaborationBinding) });
-    session.text.observe(() => {
-        if (!showingXml || collaboration !== session) return;
-        dslSource = session.text.toString();
-        markSourceChanged();
-        clearTimeout(debounce);
-        if (autoRefresh.checked) debounce = setTimeout(() => void render(), 120);
-        else refreshPreview.disabled = false;
+    view.dispatch({ effects: collaborationCompartment.reconfigure(yCollab(session.text, session.provider.awareness)) });
+    session.provider.on("status", ({ connected }) => {
+        if (collaboration === session) collaborationStatus.textContent = connected ? `${peerCount} peers · connected` : "Reconnecting…";
     });
-}
-
-async function pairingAction(action: () => Promise<void>): Promise<void> {
-    collaborateButton.disabled = collaborationInvite.disabled = collaborationConnect.disabled = true;
-    try { await action(); } catch (error) {
-        collaborationStatus.textContent = error instanceof Error ? error.message : String(error);
-        if (!collaborationDialog.open) collaborationDialog.showModal();
-    } finally { collaborateButton.disabled = collaborationInvite.disabled = collaborationConnect.disabled = false; }
-}
-
-async function createInvitation(): Promise<void> {
-    collaborationLink.value = "";
-    collaborationCopy.disabled = true;
-    collaborationInstructions.textContent = "Preparing invitation…";
-    collaborationLink.value = await collaboration!.invite(location.href);
-    collaborationCopy.disabled = false;
-    collaborationInstructions.textContent = "Send this invitation to one guest. They must return their answer link; paste it below. Create a new invitation for each guest. Keep this tab open.";
-}
-
-void pairingAction(async () => {
-    const pairing = readPairingLink(location.href);
-    if (!pairing) {
-        const sessionId = new URLSearchParams(location.hash.slice(1)).get("session");
-        if (!sessionId) return;
-        if (!/^[\w-]{1,80}$/.test(sessionId)) throw new Error("Invalid session link");
-        await joinCollaboration(sessionId);
-        collaborationDialog.showModal();
-        await createInvitation();
-        return;
-    }
-    if (pairing.description.type === "answer") {
-        collaborationDialog.showModal();
-        collaborationInstructions.textContent = "Paste this answer link into the host's original tab. Opening it here cannot connect that tab.";
-        collaborationLink.value = location.href;
-        collaborationHostControls.hidden = true;
-        return;
-    }
-    await joinCollaboration(pairing.roomId);
+    session.provider.on("peers", ({ webrtcPeers }) => {
+        peerCount = webrtcPeers.length + 1;
+        if (collaboration === session) collaborationStatus.textContent = `${peerCount} ${peerCount === 1 ? "peer" : "peers"} · ${session.provider.connected ? "connected" : "connecting"}`;
+    });
     collaborationDialog.showModal();
-    collaborationHostControls.hidden = true;
-    collaborationInstructions.textContent = "Preparing answer…";
-    collaborationCopy.disabled = true;
-    collaborationLink.value = await collaboration!.answer(location.href, pairing);
-    collaborationCopy.disabled = false;
-    collaborationInstructions.textContent = "Send this answer link back to the host. Keep this tab open, then close this dialog with Escape to edit.";
-});
+}
+
+const roomId = new URLSearchParams(location.search).get("room");
+const roomSecret = new URLSearchParams(location.hash.slice(1)).get("key");
+if (roomId && roomSecret) void joinCollaboration(roomId, roomSecret);
 
 collaborateButton.addEventListener("click", () => {
     if (collaboration) { collaborationDialog.showModal(); return; }
-    void pairingAction(async () => {
-        if (showingXml) xmlToggle.click();
-        const sessionId = crypto.randomUUID();
-        await joinCollaboration(sessionId, currentSource());
-        history.replaceState(null, "", `${location.pathname}#session=${sessionId}`);
-        collaborationDialog.showModal();
-        await createInvitation();
-    });
-});
-collaborationInvite.addEventListener("click", () => { void pairingAction(createInvitation); });
-collaborationConnect.addEventListener("click", () => {
-    void pairingAction(async () => {
-        await collaboration!.accept(collaborationAnswer.value.trim());
-        collaborationAnswer.value = "";
-        collaborationStatus.textContent = "Connecting to guest…";
-    });
+    const room = crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const secret = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    history.replaceState(null, "", `?room=${encodeURIComponent(room)}#key=${secret}`);
+    void joinCollaboration(room, secret, currentSource());
 });
 collaborationCopy.addEventListener("click", async () => {
     try {
@@ -526,15 +458,13 @@ collaborationCopy.addEventListener("click", async () => {
     }
 });
 collaborationLeave.addEventListener("click", () => {
-    view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
-    collaborationBinding = [];
     collaboration?.destroy();
     collaboration = undefined;
-    collaborationHostControls.hidden = false;
+    peerCount = 0;
+    view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
     history.replaceState(null, "", location.pathname);
     setButtonLabel(collaborateButton, "Collaborate");
     collaborationDialog.close();
-    scheduleShareUrl();
 });
 savedReset.addEventListener("click", () => {
     if (!savedFailed) return;
@@ -699,11 +629,9 @@ function setEditorMode(): void {
     xmlToggle.setAttribute("aria-label", showingXml ? "Switch editor to DrawDSL" : "Switch editor to draw.io XML");
     setButtonLabel(xmlToggle, showingXml ? "Show DSL" : "Show XML");
     view.dispatch({ effects: modeCompartment.reconfigure(editorExtensions(showingXml, darkMode)) });
-    if (collaboration) view.dispatch({ effects: collaborationCompartment.reconfigure(showingXml ? [] : collaborationBinding) });
 }
 xmlToggle.addEventListener("click", () => {
     if (!latestXml) return;
-    if (collaboration) view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
     showingXml = !showingXml;
     if (showingXml) {
         dslSource = getEditorFull();
