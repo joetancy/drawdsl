@@ -17,8 +17,10 @@ import type { createCollaborationSession } from "./collaboration/collaboration.j
 
 const source = document.querySelector<HTMLDivElement>("#source")!;
 const collaborateButton = document.querySelector<HTMLButtonElement>("#collaborate")!;
+const collaborationCount = document.querySelector<HTMLSpanElement>("#collaboration-count")!;
 const collaborationDialog = document.querySelector<HTMLDialogElement>("#collaboration")!;
 const collaborationStatus = document.querySelector<HTMLParagraphElement>("#collaboration-status")!;
+const collaborationParticipants = document.querySelector<HTMLUListElement>("#collaboration-participants")!;
 const collaborationLink = document.querySelector<HTMLInputElement>("#collaboration-link")!;
 const collaborationCopy = document.querySelector<HTMLButtonElement>("#collaboration-copy")!;
 const collaborationLeave = document.querySelector<HTMLButtonElement>("#collaboration-leave")!;
@@ -420,6 +422,7 @@ async function joinCollaboration(roomId: string, secret: string, initialContent?
     setButtonLabel(collaborateButton, "Collaborating");
     await session.persistence.whenSynced;
     if (collaboration !== session) return;
+    session.introduce(initialContent !== undefined);
     if (!session.text.length && initialContent) session.text.insert(0, initialContent);
     if (session.text.toString() !== editorText()) {
         dslSource = session.text.toString();
@@ -432,8 +435,37 @@ async function joinCollaboration(roomId: string, secret: string, initialContent?
         if (collaboration !== session) return;
         const participants = session.provider.awareness.getStates().size;
         collaborationStatus.textContent = participants > 1 ? `${participants} participants · connected` : "Waiting for another participant · open the invitation link in another browser or tab";
+        setButtonLabel(collaborateButton, "Collaborating");
+        collaborationCount.hidden = false;
+        collaborationCount.textContent = String(participants);
+        collaborateButton.setAttribute("aria-label", `Collaboration session: ${participants} ${participants === 1 ? "participant" : "participants"}`);
+        const hostId = session.metadata.get("host");
+        let hostPresent = false;
+        const entries = [...session.provider.awareness.getStates()].sort(([a], [b]) => {
+            const aHost = session.provider.awareness.getStates().get(a)?.user?.id === hostId;
+            const bHost = session.provider.awareness.getStates().get(b)?.user?.id === hostId;
+            return Number(bHost) - Number(aHost) || a - b;
+        });
+        collaborationParticipants.replaceChildren(...entries.map(([clientId, state]) => {
+            const item = document.createElement("li");
+            const user = state.user as { id?: unknown; name?: unknown } | undefined;
+            const isHost = hostId !== undefined && user?.id === hostId;
+            const isYou = clientId === session.doc.clientID;
+            hostPresent ||= isHost;
+            const name = typeof user?.name === "string" ? user.name.slice(0, 80) : `Participant ${clientId}`;
+            item.textContent = `${name}${isHost ? " · Host" : ""}${isYou ? " · You" : ""}`;
+            item.dataset.host = String(isHost);
+            item.dataset.you = String(isYou);
+            return item;
+        }));
+        if (hostId && !hostPresent) {
+            const item = document.createElement("li");
+            item.textContent = "Host is offline · participants can continue editing";
+            collaborationParticipants.append(item);
+        }
     };
     session.provider.awareness.on("change", updateParticipants);
+    session.metadata.observe(updateParticipants);
     session.provider.on("status", updateParticipants);
     updateParticipants();
     collaborationDialog.showModal();
@@ -465,6 +497,9 @@ collaborationLeave.addEventListener("click", () => {
     view.dispatch({ effects: collaborationCompartment.reconfigure([]) });
     history.replaceState(null, "", location.pathname);
     setButtonLabel(collaborateButton, "Collaborate");
+    collaborationCount.hidden = true;
+    collaborateButton.setAttribute("aria-label", "Collaborate");
+    collaborationParticipants.replaceChildren();
     collaborationDialog.close();
 });
 document.querySelector<HTMLButtonElement>("#collaboration-close")!.addEventListener("click", () => collaborationDialog.close());
@@ -699,6 +734,7 @@ themeToggle.addEventListener("click", () => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
     setButtonLabel(themeToggle, darkMode ? "Light theme" : "Dark theme");
     themeToggle.setAttribute("aria-pressed", String(darkMode));
+    themeToggle.setAttribute("aria-label", darkMode ? "Toggle light theme" : "Toggle dark theme");
     setEditorMode();
     if (lastGoodXml) layerPreview.redraw(darkMode);
 });
