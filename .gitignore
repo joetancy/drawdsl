@@ -12,3 +12,5 @@ dist/
 # Local tooling noise
 *.log
 .DS_Store
+# Added by code-review-graph
+.code-review-graph/

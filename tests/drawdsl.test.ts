@@ -188,6 +188,26 @@ test("normalizer preserves and reports materially different name collisions", ()
     assert.ok(result.resources["azure:queue_fill_123456"]);
 });
 
+test("all AWS group catalogue entries contain children and retain their palette styles", async () => {
+    const groups = Object.entries(DRAWIO_RESOURCES).filter(([id]) => id.startsWith("aws:group_"));
+    assert.ok(groups.length > 0);
+    for (const [id, resource] of groups) {
+        const ast = parseDsl(`${id} group {\n    aws:lambda child\n}`);
+        assert.equal(ast.nodes[0]!.definition.role, "container", id);
+        const layout = await layoutDocument(ast);
+        const group = layout.nodes.find((node) => node.id === "group")!;
+        const child = layout.nodes.find((node) => node.id === "child")!;
+        assert.equal(child.parentId, "group", id);
+        assert.ok(child.x >= group.x && child.y >= group.y
+            && child.x + child.width <= group.x + group.width
+            && child.y + child.height <= group.y + group.height, id);
+        const xml = renderDrawio(layout.nodes, layout.edges);
+        assert.match(xml, /id="child"[^\n]*parent="group"/);
+        assert.match(xml, /id="group"[^\n]*container=1;/);
+        assert.ok(xml.includes(resource.style.replaceAll("&", "&amp;").replaceAll('"', "&quot;")), id);
+    }
+});
+
 test("AWS general icons render without resource tiles", () => {
     for (const name of ["client", "corporate_data_center", "general", "mobile_client", "traditional_server", "user", "users"]) {
         const { definition } = resolveSymbol({ namespace: "aws", name });
@@ -506,6 +526,32 @@ test("global edge spacing normalizes clear parallel runs to the configured pitch
     const firstLane = routes.get("first")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
     const secondLane = routes.get("second")!.bendPoints.find((point, index, points) => points[index + 1]?.y === point.y)!.y;
     assert.equal(Math.abs(firstLane - secondLane), DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+});
+
+test("spacing finds long shared runs and neighboring lanes across negative bucket boundaries", () => {
+    const edges = [0, 1].map((declarationOrder) => ({
+        id: `edge${declarationOrder}`, source: `source${declarationOrder}`, target: `target${declarationOrder}`,
+        operator: "-->" as const, declarationOrder,
+    }));
+    for (const vertical of [false, true]) {
+        const point = (x: number, y: number) => vertical ? { x: y, y: x } : { x, y };
+        for (const lanes of [[-20.5, -20.5], [-20.5, -19.5], [-0.5, 0.5]]) {
+            const routes = new Map(edges.map((edge, i) => [edge.id, {
+                sourcePoint: point(-400 + i * 40, -200),
+                bendPoints: [point(-400 + i * 40, lanes[i]!), point(400 - i * 40, lanes[i]!)],
+                targetPoint: point(400 - i * 40, 200),
+            }]));
+            enforceGlobalEdgeSpacing([], edges, routes, DEFAULT_LAYOUT_CONFIG);
+            const finalLanes = edges.map((edge) => {
+                const route = routes.get(edge.id)!;
+                assert.equal(route.bendPoints.length, 2);
+                assert.deepEqual(route.sourcePoint, point(-400 + edge.declarationOrder * 40, -200));
+                assert.deepEqual(route.targetPoint, point(400 - edge.declarationOrder * 40, 200));
+                return vertical ? route.bendPoints[0]!.x : route.bendPoints[0]!.y;
+            });
+            assert.ok(Math.abs(finalLanes[0]! - finalLanes[1]!) >= DEFAULT_LAYOUT_CONFIG.edgeSpacing);
+        }
+    }
 });
 
 test("local spacing adjustments preserve unrelated distant routes", () => {

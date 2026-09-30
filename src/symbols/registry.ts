@@ -10,6 +10,7 @@ const cloudSymbols = Object.fromEntries(Object.entries(DRAWIO_RESOURCES).map(([i
     const legacy = namespace === "aws" ? awsProvider.symbols[name] : undefined;
     const definition = legacy?.role === "container" ? legacy : {
         ...(legacy ?? { role: "resource" as const, drawio: { shape: resource.drawioShape } }),
+        role: namespace === "aws" && name.startsWith("group_") ? "container" as const : legacy?.role ?? "resource" as const,
         drawio: { ...(legacy?.drawio ?? { shape: resource.drawioShape }), style: resource.style },
         width: resource.width || legacy?.width,
         height: resource.height || legacy?.height,
